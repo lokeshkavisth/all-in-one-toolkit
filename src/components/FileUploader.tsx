@@ -22,6 +22,7 @@ export function FileUploader({
 }: FileUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback(
     (newFiles: FileList | null) => {
