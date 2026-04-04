@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { Upload, X, FileIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ export function FileUploader({
 }: FileUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback(
     (newFiles: FileList | null) => {
@@ -44,10 +45,11 @@ export function FileUploader({
 
   return (
     <div className="w-full">
-      <label
+      <div
         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
         onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files); }}
+        onClick={() => inputRef.current?.click()}
         className={cn(
           "flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 cursor-pointer transition-colors",
           dragActive
@@ -64,17 +66,18 @@ export function FileUploader({
             {description || `Max ${maxSize}MB per file`}
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm">
+        <Button type="button" variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
           Browse Files
         </Button>
         <input
+          ref={inputRef}
           type="file"
           accept={accept}
           multiple={multiple}
           onChange={(e) => handleFiles(e.target.files)}
           className="hidden"
         />
-      </label>
+      </div>
 
       {/* File list */}
       {files.length > 0 && (
