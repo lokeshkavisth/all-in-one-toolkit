@@ -7,7 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import Index from "./pages/Index";
 import ToolPlaceholder from "./pages/ToolPlaceholder";
-import ResizeImage from "./pages/ResizeImage";
+import ImageCompressor from "./pages/ImageCompressor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
