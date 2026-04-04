@@ -23,7 +23,7 @@ const App = () => (
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/tools/resize-image" element={<ResizeImage />} />
+              <Route path="/tools/image-compressor" element={<ImageCompressor />} />
               <Route path="/tools/:toolId" element={<ToolPlaceholder />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

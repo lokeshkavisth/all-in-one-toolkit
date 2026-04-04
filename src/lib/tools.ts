@@ -73,12 +73,12 @@ export const tools: Tool[] = [
     path: "/tools/pdf-to-excel",
   },
   {
-    id: "resize-image",
-    name: "Resize Image",
-    description: "Increase or reduce image dimensions with quality control",
+    id: "image-compressor",
+    name: "Image Compressor",
+    description: "Reduce or increase image file size with quality control",
     icon: ImageIcon,
     category: "image",
-    path: "/tools/resize-image",
+    path: "/tools/image-compressor",
   },
   {
     id: "crop-image",
