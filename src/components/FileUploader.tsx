@@ -44,10 +44,11 @@ export function FileUploader({
 
   return (
     <div className="w-full">
-      <label
+      <div
         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
         onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files); }}
+        onClick={() => inputRef.current?.click()}
         className={cn(
           "flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 cursor-pointer transition-colors",
           dragActive
@@ -64,17 +65,18 @@ export function FileUploader({
             {description || `Max ${maxSize}MB per file`}
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm">
+        <Button type="button" variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
           Browse Files
         </Button>
         <input
+          ref={inputRef}
           type="file"
           accept={accept}
           multiple={multiple}
           onChange={(e) => handleFiles(e.target.files)}
           className="hidden"
         />
-      </label>
+      </div>
 
       {/* File list */}
       {files.length > 0 && (
