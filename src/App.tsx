@@ -7,6 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import Index from "./pages/Index";
 import ToolPlaceholder from "./pages/ToolPlaceholder";
+import ResizeImage from "./pages/ResizeImage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/tools/resize-image" element={<ResizeImage />} />
               <Route path="/tools/:toolId" element={<ToolPlaceholder />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
