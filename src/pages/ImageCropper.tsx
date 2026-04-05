@@ -355,8 +355,8 @@ export default function ImageCropper() {
               </Select>
             </div>
 
-            {/* Crop Info */}
-            <div className="rounded-xl border bg-card p-4 space-y-2">
+            {/* Crop Size & Custom Pixels */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crop Size</Label>
               <p className="text-sm font-medium">
                 {Math.round(crop.width * (imageSize.w / displaySize.w))} × {Math.round(crop.height * (imageSize.h / displaySize.h))} px
@@ -364,6 +364,33 @@ export default function ImageCropper() {
               <p className="text-xs text-muted-foreground">
                 Original: {imageSize.w} × {imageSize.h} px
               </p>
+              <div className="border-t pt-3 space-y-2">
+                <Label className="text-xs text-muted-foreground">Set exact size (pixels)</Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    placeholder="Width"
+                    value={pixelW}
+                    onChange={(e) => setPixelW(e.target.value)}
+                    className="h-8 text-xs"
+                    min={1}
+                    max={imageSize.w}
+                  />
+                  <span className="text-muted-foreground text-xs">×</span>
+                  <Input
+                    type="number"
+                    placeholder="Height"
+                    value={pixelH}
+                    onChange={(e) => setPixelH(e.target.value)}
+                    className="h-8 text-xs"
+                    min={1}
+                    max={imageSize.h}
+                  />
+                  <Button variant="secondary" size="sm" className="h-8 px-3 text-xs shrink-0" onClick={applyCropPixels}>
+                    Apply
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* Actions */}
