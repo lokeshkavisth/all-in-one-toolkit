@@ -55,6 +55,25 @@ export default function ImageCropper() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [cropStart, setCropStart] = useState<CropBox>({ x: 0, y: 0, width: 0, height: 0 });
   const [croppedUrl, setCroppedUrl] = useState<string | null>(null);
+  const [pixelW, setPixelW] = useState("");
+  const [pixelH, setPixelH] = useState("");
+
+  const applyCropPixels = useCallback(() => {
+    const pw = parseInt(pixelW);
+    const ph = parseInt(pixelH);
+    if (!pw || !ph || pw <= 0 || ph <= 0 || displaySize.w === 0) return;
+    const scaleX = displaySize.w / imageSize.w;
+    const scaleY = displaySize.h / imageSize.h;
+    const dw = clamp(pw * scaleX, 20, displaySize.w);
+    const dh = clamp(ph * scaleY, 20, displaySize.h);
+    setCrop(prev => ({
+      x: clamp(prev.x, 0, displaySize.w - dw),
+      y: clamp(prev.y, 0, displaySize.h - dh),
+      width: dw,
+      height: dh,
+    }));
+    setAspect("free");
+  }, [pixelW, pixelH, displaySize, imageSize]);
 
   const getAspectRatio = useCallback((): number | null => {
     const preset = ASPECT_PRESETS.find((p) => p.value === aspect);
