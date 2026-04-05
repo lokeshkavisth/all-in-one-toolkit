@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import Index from "./pages/Index";
 import ToolPlaceholder from "./pages/ToolPlaceholder";
 import ImageCompressor from "./pages/ImageCompressor";
+import ImageCropper from "./pages/ImageCropper";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
