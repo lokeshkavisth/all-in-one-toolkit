@@ -388,16 +388,16 @@ export default function PassportPhoto() {
                     <div className="flex items-center gap-2">
                       <ZoomOut className="h-3.5 w-3.5 text-muted-foreground" />
                       <Slider
-                        value={[zoom]}
-                        onValueChange={([v]) => setZoom(v)}
-                        min={0.1}
-                        max={5}
+                        value={[zoomLevel]}
+                        onValueChange={([v]) => setZoomLevel(v)}
+                        min={0.5}
+                        max={4}
                         step={0.01}
                         className="flex-1"
                       />
                       <ZoomIn className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
-                    <p className="text-xs text-muted-foreground text-center">{Math.round(zoom * 100)}% zoom</p>
+                    <p className="text-xs text-muted-foreground text-center">{Math.round(zoomLevel * 100)}% zoom</p>
                   </div>
                   <Button
                     variant="outline"
