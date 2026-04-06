@@ -60,8 +60,8 @@ export default function PassportPhoto() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState({ w: 0, h: 0 });
 
-  // Crop state — position of image within crop viewport
-  const [zoom, setZoom] = useState(1);
+  // Crop state — zoom is a multiplier where 1 = fill the crop box
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 = fill, 2 = 2× etc.
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
   const [rotation, setRotation] = useState(0);
@@ -94,6 +94,13 @@ export default function PassportPhoto() {
   const CROP_DISPLAY_H = 340;
   const CROP_DISPLAY_W = CROP_DISPLAY_H * cropAspect;
 
+  // Base scale: the scale at which the image exactly fills the crop viewport
+  const baseScale = imageSize.w > 0
+    ? Math.max(CROP_DISPLAY_W / imageSize.w, CROP_DISPLAY_H / imageSize.h)
+    : 1;
+  // Actual pixel scale = baseScale * zoomLevel
+  const zoom = baseScale * zoomLevel;
+
   /* ──── Load image ──── */
   const loadImage = useCallback((files: File[]) => {
     if (!files.length) return;
@@ -109,25 +116,19 @@ export default function PassportPhoto() {
         setCroppedUrl(null);
         setCroppedBlob(null);
         setStep("crop");
-        // Fit image to fill the crop viewport
-        const fillScale = Math.max(CROP_DISPLAY_W / img.width, CROP_DISPLAY_H / img.height);
-        setZoom(fillScale);
+        setZoomLevel(1);
         setOffsetX(0);
         setOffsetY(0);
       };
       img.src = src;
     };
     reader.readAsDataURL(files[0]);
-  }, [CROP_DISPLAY_W, CROP_DISPLAY_H]);
+  }, []);
 
-  // Refit when preset changes
+  // Reset position when preset changes
   useEffect(() => {
     if (!imgRef.current) return;
-    const img = imgRef.current;
-    const newAspect = preset.wMM / preset.hMM;
-    const cw = CROP_DISPLAY_H * newAspect;
-    const fillScale = Math.max(cw / img.width, CROP_DISPLAY_H / img.height);
-    setZoom(fillScale);
+    setZoomLevel(1);
     setOffsetX(0);
     setOffsetY(0);
   }, [presetId]);
