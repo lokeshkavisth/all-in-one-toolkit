@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import ToolPlaceholder from "./pages/ToolPlaceholder";
 import ImageCompressor from "./pages/ImageCompressor";
 import ImageCropper from "./pages/ImageCropper";
+import PassportPhoto from "./pages/PassportPhoto";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/tools/image-compressor" element={<ImageCompressor />} />
               <Route path="/tools/crop-image" element={<ImageCropper />} />
+              <Route path="/tools/passport-photo" element={<PassportPhoto />} />
               <Route path="/tools/:toolId" element={<ToolPlaceholder />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
