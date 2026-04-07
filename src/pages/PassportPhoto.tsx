@@ -169,7 +169,7 @@ export default function PassportPhoto() {
     if (!el) return;
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
+  }, [handleWheel, imageSrc]);
 
   /* ──── Crop the photo ──── */
   const doCrop = useCallback(() => {
