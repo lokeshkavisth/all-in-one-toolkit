@@ -152,6 +152,25 @@ export default function PassportPhoto() {
 
   const handleMouseUp = () => setDragging(false);
 
+  /* ──── Mouse wheel zoom ──── */
+  const handleWheel = useCallback(
+    (e: WheelEvent) => {
+      e.preventDefault();
+      setZoomLevel((prev) => {
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        return Math.min(4, Math.max(0.5, prev + delta));
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    const el = cropContainerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
+
   /* ──── Crop the photo ──── */
   const doCrop = useCallback(() => {
     if (!imgRef.current) return;
