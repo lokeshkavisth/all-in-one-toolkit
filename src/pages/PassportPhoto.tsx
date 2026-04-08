@@ -121,7 +121,7 @@ export default function PassportPhoto() {
   // Layout controls
   const [customCols, setCustomCols] = useState(5);
   const [customRows, setCustomRows] = useState(0); // 0 = auto
-  const [gapMM, setGapMM] = useState(3);
+  const [gapMM, setGapMM] = useState(4);
   const [marginMM, setMarginMM] = useState(5);
 
   // Result
@@ -135,13 +135,19 @@ export default function PassportPhoto() {
     : presetData;
   const pageSize = PAGE_SIZES.find((p) => p.id === pageSizeId)!;
 
-  // Compute grid
-  const autoCols = Math.floor((pageSize.wMM - 2 * marginMM + gapMM) / (preset.wMM + gapMM));
-  const autoRows = Math.floor((pageSize.hMM - 2 * marginMM + gapMM) / (preset.hMM + gapMM));
-  const cols = customCols > 0 ? customCols : Math.max(1, autoCols);
-  const rows = customRows > 0 ? customRows : Math.max(1, autoRows);
+  // Auto-compute cols/rows based on page size and photo size
+  const autoCols = Math.max(1, Math.floor((pageSize.wMM - 2 * marginMM + gapMM) / (preset.wMM + gapMM)));
+  const autoRows = Math.max(1, Math.floor((pageSize.hMM - 2 * marginMM + gapMM) / (preset.hMM + gapMM)));
+  const cols = customCols > 0 ? customCols : autoCols;
+  const rows = customRows > 0 ? customRows : autoRows;
   const perPage = cols * rows;
   const totalPages = Math.ceil(quantity / perPage);
+
+  // Auto-adjust cols/rows when page size changes
+  useEffect(() => {
+    setCustomCols(0);
+    setCustomRows(0);
+  }, [pageSizeId]);
 
   /* ──── Crop viewport dimensions ──── */
   const cropAspect = preset.wMM / preset.hMM;
@@ -438,13 +444,19 @@ export default function PassportPhoto() {
   const printPDF = useCallback(async () => {
     const doc = await generatePDF();
     if (!doc) return;
-    const blobUrl = doc.output("bloburl");
-    const printWindow = window.open(blobUrl as unknown as string);
-    if (printWindow) {
-      printWindow.addEventListener("load", () => {
-        printWindow.print();
-      });
-    }
+    const pdfBlob = doc.output("blob");
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.src = blobUrl;
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
+    };
     toast({ title: "Print dialog opened" });
   }, [generatePDF, toast]);
 
@@ -732,24 +744,24 @@ export default function PassportPhoto() {
                   </div>
 
                   <div className="flex gap-2 items-center">
-                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Gap</Label>
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Gap between photos</Label>
                     <Input
                       type="number"
                       value={gapMM}
                       onChange={(e) => setGapMM(clamp(parseFloat(e.target.value) || 0, 0, 30))}
-                      className="h-8 text-sm flex-1"
+                      className="h-8 text-sm w-20"
                       min={0} max={30} step={0.5}
                     />
                     <span className="text-xs text-muted-foreground">mm</span>
                   </div>
 
                   <div className="flex gap-2 items-center">
-                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Margin</Label>
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Page margin</Label>
                     <Input
                       type="number"
                       value={marginMM}
                       onChange={(e) => setMarginMM(clamp(parseFloat(e.target.value) || 0, 0, 50))}
-                      className="h-8 text-sm flex-1"
+                      className="h-8 text-sm w-20"
                       min={0} max={50} step={0.5}
                     />
                     <span className="text-xs text-muted-foreground">mm</span>
