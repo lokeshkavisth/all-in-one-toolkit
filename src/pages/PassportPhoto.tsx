@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move } from "lucide-react";
+import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer } from "lucide-react";
 import { ToolPageLayout } from "@/components/ToolPageLayout";
 import { FileUploader } from "@/components/FileUploader";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,33 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
+/* ──── Unit helpers ──── */
+type SizeUnit = "inch" | "mm" | "px";
+
+const MM_PER_INCH = 25.4;
+const DPI = 300;
+const MM_TO_PX = DPI / MM_PER_INCH;
+
+function toMM(value: number, unit: SizeUnit): number {
+  switch (unit) {
+    case "mm": return value;
+    case "inch": return value * MM_PER_INCH;
+    case "px": return value / MM_TO_PX;
+  }
+}
+
+function fromMM(mm: number, unit: SizeUnit): number {
+  switch (unit) {
+    case "mm": return Math.round(mm * 100) / 100;
+    case "inch": return Math.round((mm / MM_PER_INCH) * 1000) / 1000;
+    case "px": return Math.round(mm * MM_TO_PX);
+  }
+}
+
+function unitLabel(unit: SizeUnit): string {
+  return unit;
+}
+
 /* ──── Passport size presets (w×h in mm) ──── */
 interface PhotoPreset {
   id: string;
@@ -19,7 +46,7 @@ interface PhotoPreset {
 }
 
 const PHOTO_PRESETS: PhotoPreset[] = [
-  { id: "us", label: "US (2×2 in / 51×51 mm)", wMM: 50.8, hMM: 50.8 },
+  { id: "us", label: "US (2×2 in)", wMM: 50.8, hMM: 50.8 },
   { id: "uk", label: "UK/EU (35×45 mm)", wMM: 35, hMM: 45 },
   { id: "india", label: "India (51×51 mm)", wMM: 51, hMM: 51 },
   { id: "schengen", label: "Schengen (35×45 mm)", wMM: 35, hMM: 45 },
@@ -27,6 +54,7 @@ const PHOTO_PRESETS: PhotoPreset[] = [
   { id: "china", label: "China (33×48 mm)", wMM: 33, hMM: 48 },
   { id: "japan", label: "Japan (35×45 mm)", wMM: 35, hMM: 45 },
   { id: "australia", label: "Australia (35×45 mm)", wMM: 35, hMM: 45 },
+  { id: "emitra", label: "E-Mitra (1.30×1.60 in)", wMM: 1.30 * MM_PER_INCH, hMM: 1.60 * MM_PER_INCH },
   { id: "custom", label: "Custom Size", wMM: 35, hMM: 45 },
 ];
 
@@ -44,9 +72,6 @@ const PAGE_SIZES: PageSize[] = [
   { id: "6x4", label: "6×4 inches", wMM: 152.4, hMM: 101.6 },
 ];
 
-const DPI = 300;
-const MM_TO_PX = DPI / 25.4;
-
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
@@ -58,6 +83,9 @@ export default function PassportPhoto() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cropContainerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+
+  // Unit
+  const [sizeUnit, setSizeUnit] = useState<SizeUnit>("inch");
 
   // Image state
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -86,12 +114,12 @@ export default function PassportPhoto() {
   const [showCutLines, setShowCutLines] = useState(true);
 
   // Border settings
-  const [borderEnabled, setBorderEnabled] = useState(false);
+  const [borderEnabled, setBorderEnabled] = useState(true);
   const [borderColor, setBorderColor] = useState("#000000");
-  const [borderThickness, setBorderThickness] = useState(1); // in mm
+  const [borderThicknessPx, setBorderThicknessPx] = useState(3); // in px
 
   // Layout controls
-  const [customCols, setCustomCols] = useState(0); // 0 = auto
+  const [customCols, setCustomCols] = useState(5);
   const [customRows, setCustomRows] = useState(0); // 0 = auto
   const [gapMM, setGapMM] = useState(3);
   const [marginMM, setMarginMM] = useState(5);
@@ -103,7 +131,7 @@ export default function PassportPhoto() {
 
   const presetData = PHOTO_PRESETS.find((p) => p.id === presetId)!;
   const preset = presetId === "custom"
-    ? { ...presetData, wMM: customW, hMM: customH }
+    ? { ...presetData, wMM: toMM(customW, sizeUnit), hMM: toMM(customH, sizeUnit) }
     : presetData;
   const pageSize = PAGE_SIZES.find((p) => p.id === pageSizeId)!;
 
@@ -241,8 +269,6 @@ export default function PassportPhoto() {
     const ctx = canvas.getContext("2d")!;
 
     if (selectBox && selectBox.w > 5 && selectBox.h > 5) {
-      // Manual selection crop
-      // Map selection box from display coords to image coords
       const imgDisplayW = imageSize.w * zoom;
       const imgDisplayH = imageSize.h * zoom;
       const imgDisplayX = CROP_DISPLAY_W / 2 - imgDisplayW / 2 + offsetX;
@@ -255,7 +281,6 @@ export default function PassportPhoto() {
 
       ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
     } else {
-      // Pan/zoom crop
       const scaleToOutput = outW / CROP_DISPLAY_W;
       const drawW = imageSize.w * zoom * scaleToOutput;
       const drawH = imageSize.h * zoom * scaleToOutput;
@@ -271,11 +296,10 @@ export default function PassportPhoto() {
     }
 
     // Draw border if enabled
-    if (borderEnabled && borderThickness > 0) {
-      const borderPx = borderThickness * MM_TO_PX;
+    if (borderEnabled && borderThicknessPx > 0) {
       ctx.strokeStyle = borderColor;
-      ctx.lineWidth = borderPx;
-      ctx.strokeRect(borderPx / 2, borderPx / 2, outW - borderPx, outH - borderPx);
+      ctx.lineWidth = borderThicknessPx;
+      ctx.strokeRect(borderThicknessPx / 2, borderThicknessPx / 2, outW - borderThicknessPx, outH - borderThicknessPx);
     }
 
     canvas.toBlob(
@@ -289,7 +313,7 @@ export default function PassportPhoto() {
       "image/jpeg",
       0.95
     );
-  }, [zoom, offsetX, offsetY, rotation, preset, imageSize, selectBox, borderEnabled, borderColor, borderThickness, CROP_DISPLAY_W, CROP_DISPLAY_H, toast]);
+  }, [zoom, offsetX, offsetY, rotation, preset, imageSize, selectBox, borderEnabled, borderColor, borderThicknessPx, CROP_DISPLAY_W, CROP_DISPLAY_H, toast]);
 
   /* ──── Render page preview ──── */
   const renderPagePreview = (pageIndex: number) => {
@@ -307,10 +331,9 @@ export default function PassportPhoto() {
     const photoW = preset.wMM * pageScale;
     const photoH = preset.hMM * pageScale;
 
-    const gridW = cols * photoW + (cols - 1) * gapS;
-    const gridH = rows * photoH + (rows - 1) * gapS;
-    const startX = (pw - gridW) / 2;
-    const startY = (ph - gridH) / 2;
+    // Start from top-left (margin)
+    const startX = marginS;
+    const startY = marginS;
 
     const photos = [];
     for (let i = 0; i < count; i++) {
@@ -360,9 +383,9 @@ export default function PassportPhoto() {
     );
   };
 
-  /* ──── Download as PDF ──── */
-  const downloadPDF = useCallback(async () => {
-    if (!croppedBlob) return;
+  /* ──── Generate PDF (shared between download and print) ──── */
+  const generatePDF = useCallback(async () => {
+    if (!croppedBlob) return null;
     const { jsPDF } = await import("jspdf");
 
     const doc = new jsPDF({
@@ -379,10 +402,9 @@ export default function PassportPhoto() {
       const startIdx = page * perPage;
       const count = Math.min(quantity - startIdx, perPage);
 
-      const gridW = cols * preset.wMM + (cols - 1) * gapMM;
-      const gridH = rows * preset.hMM + (rows - 1) * gapMM;
-      const startX = (pageSize.wMM - gridW) / 2;
-      const startY = (pageSize.hMM - gridH) / 2;
+      // Start from top-left (margin)
+      const startX = marginMM;
+      const startY = marginMM;
 
       if (showCutLines) {
         doc.setDrawColor(180);
@@ -401,9 +423,30 @@ export default function PassportPhoto() {
       }
     }
 
+    return doc;
+  }, [croppedBlob, croppedUrl, quantity, totalPages, perPage, cols, rows, preset, pageSize, gapMM, marginMM, showCutLines]);
+
+  /* ──── Download as PDF ──── */
+  const downloadPDF = useCallback(async () => {
+    const doc = await generatePDF();
+    if (!doc) return;
     doc.save("passport-photos.pdf");
     toast({ title: "PDF downloaded!", description: `${totalPages} page(s) with ${quantity} photos` });
-  }, [croppedBlob, croppedUrl, quantity, totalPages, perPage, cols, rows, preset, pageSize, gapMM, showCutLines, toast]);
+  }, [generatePDF, totalPages, quantity, toast]);
+
+  /* ──── Print directly ──── */
+  const printPDF = useCallback(async () => {
+    const doc = await generatePDF();
+    if (!doc) return;
+    const blobUrl = doc.output("bloburl");
+    const printWindow = window.open(blobUrl as unknown as string);
+    if (printWindow) {
+      printWindow.addEventListener("load", () => {
+        printWindow.print();
+      });
+    }
+    toast({ title: "Print dialog opened" });
+  }, [generatePDF, toast]);
 
   /* ──── Download single cropped photo ──── */
   const downloadSingle = () => {
@@ -434,6 +477,23 @@ export default function PassportPhoto() {
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
           {/* ── LEFT CONTROLS ── */}
           <div className="space-y-4 order-2 lg:order-1 max-h-[80vh] overflow-y-auto pr-1">
+            {/* Unit Selector */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Unit
+              </Label>
+              <Select value={sizeUnit} onValueChange={(v) => setSizeUnit(v as SizeUnit)}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inch">Inches</SelectItem>
+                  <SelectItem value="mm">Millimeters</SelectItem>
+                  <SelectItem value="px">Pixels</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Passport Size - Dropdown */}
             <div className="rounded-xl border bg-card p-4 space-y-3">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -459,28 +519,30 @@ export default function PassportPhoto() {
               {presetId === "custom" && (
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <Label className="text-xs text-muted-foreground">Width (mm)</Label>
+                    <Label className="text-xs text-muted-foreground">Width ({unitLabel(sizeUnit)})</Label>
                     <Input
                       type="number"
                       value={customW}
-                      onChange={(e) => setCustomW(clamp(parseInt(e.target.value) || 10, 10, 200))}
+                      onChange={(e) => setCustomW(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
                       className="h-8 text-sm mt-1"
+                      step={sizeUnit === "px" ? 1 : 0.01}
                     />
                   </div>
                   <div className="flex-1">
-                    <Label className="text-xs text-muted-foreground">Height (mm)</Label>
+                    <Label className="text-xs text-muted-foreground">Height ({unitLabel(sizeUnit)})</Label>
                     <Input
                       type="number"
                       value={customH}
-                      onChange={(e) => setCustomH(clamp(parseInt(e.target.value) || 10, 10, 200))}
+                      onChange={(e) => setCustomH(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
                       className="h-8 text-sm mt-1"
+                      step={sizeUnit === "px" ? 1 : 0.01}
                     />
                   </div>
                 </div>
               )}
 
               <p className="text-xs text-muted-foreground">
-                {preset.wMM} × {preset.hMM} mm
+                {fromMM(preset.wMM, sizeUnit)} × {fromMM(preset.hMM, sizeUnit)} {unitLabel(sizeUnit)}
               </p>
             </div>
 
@@ -573,15 +635,15 @@ export default function PassportPhoto() {
                       </div>
                       <div className="flex gap-2 items-center">
                         <Label className="text-xs text-muted-foreground w-16">Width</Label>
-                        <Slider
-                          value={[borderThickness]}
-                          onValueChange={([v]) => setBorderThickness(v)}
-                          min={0.1}
-                          max={5}
-                          step={0.1}
-                          className="flex-1"
+                        <Input
+                          type="number"
+                          value={borderThicknessPx}
+                          onChange={(e) => setBorderThicknessPx(clamp(parseInt(e.target.value) || 0, 0, 50))}
+                          className="h-8 text-sm flex-1"
+                          min={0}
+                          max={50}
                         />
-                        <span className="text-xs text-muted-foreground w-12 text-right">{borderThickness} mm</span>
+                        <span className="text-xs text-muted-foreground">px</span>
                       </div>
                     </div>
                   )}
@@ -651,52 +713,46 @@ export default function PassportPhoto() {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-xs text-muted-foreground">Columns</Label>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Input
-                          type="number" value={customCols || ""}
-                          placeholder="Auto"
-                          onChange={(e) => setCustomCols(clamp(parseInt(e.target.value) || 0, 0, 20))}
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                      <Input
+                        type="number" value={customCols || ""}
+                        placeholder="Auto"
+                        onChange={(e) => setCustomCols(clamp(parseInt(e.target.value) || 0, 0, 20))}
+                        className="h-8 text-sm mt-1"
+                      />
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">Rows</Label>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Input
-                          type="number" value={customRows || ""}
-                          placeholder="Auto"
-                          onChange={(e) => setCustomRows(clamp(parseInt(e.target.value) || 0, 0, 20))}
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                      <Input
+                        type="number" value={customRows || ""}
+                        placeholder="Auto"
+                        onChange={(e) => setCustomRows(clamp(parseInt(e.target.value) || 0, 0, 20))}
+                        className="h-8 text-sm mt-1"
+                      />
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex justify-between">
-                      <Label className="text-xs text-muted-foreground">Gap between photos</Label>
-                      <span className="text-xs text-muted-foreground">{gapMM} mm</span>
-                    </div>
-                    <Slider
-                      value={[gapMM]}
-                      onValueChange={([v]) => setGapMM(v)}
-                      min={0} max={15} step={0.5}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between">
-                      <Label className="text-xs text-muted-foreground">Page margin</Label>
-                      <span className="text-xs text-muted-foreground">{marginMM} mm</span>
-                    </div>
-                    <Slider
-                      value={[marginMM]}
-                      onValueChange={([v]) => setMarginMM(v)}
+                  <div className="flex gap-2 items-center">
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Gap</Label>
+                    <Input
+                      type="number"
+                      value={gapMM}
+                      onChange={(e) => setGapMM(clamp(parseFloat(e.target.value) || 0, 0, 30))}
+                      className="h-8 text-sm flex-1"
                       min={0} max={30} step={0.5}
-                      className="mt-1"
                     />
+                    <span className="text-xs text-muted-foreground">mm</span>
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Margin</Label>
+                    <Input
+                      type="number"
+                      value={marginMM}
+                      onChange={(e) => setMarginMM(clamp(parseFloat(e.target.value) || 0, 0, 50))}
+                      className="h-8 text-sm flex-1"
+                      min={0} max={50} step={0.5}
+                    />
+                    <span className="text-xs text-muted-foreground">mm</span>
                   </div>
 
                   {(customCols > 0 || customRows > 0) && (
@@ -726,6 +782,9 @@ export default function PassportPhoto() {
                 <div className="space-y-2">
                   <Button onClick={downloadPDF} className="w-full" size="lg">
                     <Download className="h-4 w-4 mr-2" /> Download PDF
+                  </Button>
+                  <Button onClick={printPDF} variant="outline" className="w-full" size="lg">
+                    <Printer className="h-4 w-4 mr-2" /> Print
                   </Button>
                   <Button onClick={downloadSingle} variant="outline" className="w-full" size="sm">
                     <Download className="h-3.5 w-3.5 mr-1.5" /> Download Single Photo
@@ -813,7 +872,7 @@ export default function PassportPhoto() {
                 {/* Border preview indicator */}
                 {borderEnabled && (
                   <p className="text-xs text-muted-foreground">
-                    Border: {borderThickness} mm {borderColor}
+                    Border: {borderThicknessPx}px {borderColor}
                   </p>
                 )}
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
