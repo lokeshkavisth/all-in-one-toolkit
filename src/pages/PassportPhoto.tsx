@@ -121,7 +121,7 @@ export default function PassportPhoto() {
   // Layout controls
   const [customCols, setCustomCols] = useState(5);
   const [customRows, setCustomRows] = useState(0); // 0 = auto
-  const [gapMM, setGapMM] = useState(3);
+  const [gapMM, setGapMM] = useState(4);
   const [marginMM, setMarginMM] = useState(5);
 
   // Result
