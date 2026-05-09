@@ -130,6 +130,12 @@ export default function PassportPhoto() {
   const [croppedUrl, setCroppedUrl] = useState<string | null>(null);
   const [step, setStep] = useState<"crop" | "layout">("crop");
 
+  // AI features (MediaPipe, runs fully in-browser via WASM)
+  const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
+  const [bgRemoved, setBgRemoved] = useState(false);
+  const [bgReplaceColor, setBgReplaceColor] = useState("#FFFFFF");
+  const [aiBusy, setAiBusy] = useState<null | "bg" | "align">(null);
+
   const presetData = PHOTO_PRESETS.find((p) => p.id === presetId)!;
   const preset = presetId === "custom"
     ? { ...presetData, wMM: toMM(customW, sizeUnit), hMM: toMM(customH, sizeUnit) }
