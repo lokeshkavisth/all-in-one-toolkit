@@ -774,6 +774,88 @@ export default function PassportPhoto() {
                   )}
                 </div>
 
+                {/* AI Tools (MediaPipe) */}
+                <div className="rounded-xl border bg-card p-4 space-y-3">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      AI Tools
+                    </Label>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleAutoAlign}
+                    disabled={aiBusy !== null}
+                  >
+                    {aiBusy === "align" ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <ScanFace className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Auto Align Face
+                  </Button>
+
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label className="text-xs text-muted-foreground">Background Replace</Label>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="color"
+                        value={bgReplaceColor}
+                        onChange={(e) => setBgReplaceColor(e.target.value)}
+                        className="h-8 w-10 rounded border cursor-pointer"
+                      />
+                      <Input
+                        value={bgReplaceColor}
+                        onChange={(e) => setBgReplaceColor(e.target.value)}
+                        className="h-8 text-xs flex-1"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["#FFFFFF", "#E6F0FA", "#D6E4F0", "#FF0000", "#F5F5F5"].map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => setBgReplaceColor(c)}
+                          className="h-6 w-6 rounded border"
+                          style={{ background: c }}
+                          aria-label={`Use ${c}`}
+                        />
+                      ))}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={handleRemoveBackground}
+                      disabled={aiBusy !== null}
+                    >
+                      {aiBusy === "bg" ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      {bgRemoved ? "Re-apply Background" : "Remove Background"}
+                    </Button>
+                    {bgRemoved && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs h-7"
+                        onClick={handleRestoreOriginal}
+                        disabled={aiBusy !== null}
+                      >
+                        <Undo2 className="h-3 w-3 mr-1" /> Restore Original
+                      </Button>
+                    )}
+                  </div>
+
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    Powered by MediaPipe — runs entirely in your browser. First use downloads ~5MB models.
+                  </p>
+                </div>
+
                 {/* Crop button */}
                 <Button onClick={doCrop} className="w-full" size="lg">
                   <Camera className="h-4 w-4 mr-2" /> Crop Photo
