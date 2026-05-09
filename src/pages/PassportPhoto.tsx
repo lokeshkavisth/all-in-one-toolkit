@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer } from "lucide-react";
+import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer, Sparkles, ScanFace, Loader2, Undo2 } from "lucide-react";
+import { removeBackground, detectFace } from "@/lib/passport-photo/mediapipe";
 import { ToolPageLayout } from "@/components/ToolPageLayout";
 import { FileUploader } from "@/components/FileUploader";
 import { Button } from "@/components/ui/button";
