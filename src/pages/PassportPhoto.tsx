@@ -229,7 +229,7 @@ export default function PassportPhoto() {
         baseImg.onerror = () => rej(new Error("load failed"));
         baseImg.src = originalImageSrc;
       });
-      const newSrc = await removeBackground(baseImg, bgReplaceColor);
+      const newSrc = await removeBackground(baseImg, bgReplaceColor, edgeRefinement);
       await swapImage(newSrc);
       setBgRemoved(true);
       toast({ title: "Background removed", description: "AI segmentation applied" });
