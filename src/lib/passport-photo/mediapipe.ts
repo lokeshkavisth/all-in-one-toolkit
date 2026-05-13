@@ -136,7 +136,7 @@ export async function removeBackground(
     }
     return out;
   };
-  let soft = eroded;
+  let soft: Float32Array = eroded;
   for (let i = 0; i < featherPasses; i++) {
     soft = blur(soft);
   }
