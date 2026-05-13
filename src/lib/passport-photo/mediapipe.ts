@@ -169,8 +169,9 @@ export async function removeBackground(
         soft[y1 * mw + x0] * (1 - wx) * wy +
         soft[y1 * mw + x1] * wx * wy;
 
-      // Steepen the curve a bit so soft fringe pulls toward bg
-      const a2 = Math.max(0, Math.min(1, (a - 0.35) / 0.35));
+      // Steepen the curve so soft fringe pulls toward bg.
+      // Higher edgeRefinement = lower threshold + steeper slope = sharper edges.
+      const a2 = Math.max(0, Math.min(1, (a - alphaBase) / alphaDiv));
 
       const i = (y * w + x) * 4;
       px[i] = px[i] * a2 + bg.r * (1 - a2);
