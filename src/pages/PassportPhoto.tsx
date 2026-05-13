@@ -134,6 +134,7 @@ export default function PassportPhoto() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [bgRemoved, setBgRemoved] = useState(false);
   const [bgReplaceColor, setBgReplaceColor] = useState("#FFFFFF");
+  const [edgeRefinement, setEdgeRefinement] = useState(50);
   const [aiBusy, setAiBusy] = useState<null | "bg" | "align">(null);
 
   const presetData = PHOTO_PRESETS.find((p) => p.id === presetId)!;
@@ -228,7 +229,7 @@ export default function PassportPhoto() {
         baseImg.onerror = () => rej(new Error("load failed"));
         baseImg.src = originalImageSrc;
       });
-      const newSrc = await removeBackground(baseImg, bgReplaceColor);
+      const newSrc = await removeBackground(baseImg, bgReplaceColor, edgeRefinement);
       await swapImage(newSrc);
       setBgRemoved(true);
       toast({ title: "Background removed", description: "AI segmentation applied" });
@@ -242,7 +243,7 @@ export default function PassportPhoto() {
     } finally {
       setAiBusy(null);
     }
-  }, [originalImageSrc, bgReplaceColor, swapImage, toast]);
+  }, [originalImageSrc, bgReplaceColor, edgeRefinement, swapImage, toast]);
 
   /* ──── AI: Restore original photo ──── */
   const handleRestoreOriginal = useCallback(async () => {
@@ -824,6 +825,22 @@ export default function PassportPhoto() {
                           aria-label={`Use ${c}`}
                         />
                       ))}
+                    </div>
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] text-muted-foreground">Edge Refinement</Label>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">{edgeRefinement}%</span>
+                      </div>
+                      <Slider
+                        value={[edgeRefinement]}
+                        onValueChange={([v]) => setEdgeRefinement(v)}
+                        min={0}
+                        max={100}
+                        step={1}
+                      />
+                      <p className="text-[10px] text-muted-foreground leading-snug">
+                        Boost to sharpen edges around hair & shoulders. Lower for softer blending.
+                      </p>
                     </div>
                     <Button
                       variant="outline"
