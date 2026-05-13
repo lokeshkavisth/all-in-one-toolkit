@@ -86,25 +86,36 @@ export async function removeBackground(
     prob[i] = personIsLow ? 1 - v : v;
   }
 
-  // Erode slightly + feather: shrink the mask by 1-2 mask px to drop fringe halos,
-  // then blur for soft edges.
-  const eroded = new Float32Array(mw * mh);
-  for (let y = 0; y < mh; y++) {
-    for (let x = 0; x < mw; x++) {
-      let minV = 1;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = Math.min(mw - 1, Math.max(0, x + dx));
-          const ny = Math.min(mh - 1, Math.max(0, y + dy));
-          const v = prob[ny * mw + nx];
-          if (v < minV) minV = v;
+  // Edge-refinement params
+  const erodeRadius = edgeRefinement < 35 ? 1 : edgeRefinement < 70 ? 2 : 3;
+  const featherPasses = edgeRefinement > 75 ? 1 : 2;
+  const alphaBase = Math.max(0.1, 0.35 - edgeRefinement * 0.002);
+  const alphaDiv  = Math.max(0.08, 0.35 - edgeRefinement * 0.0025);
+
+  // Erode: shrink the mask inward to clip hair/shoulder halos.
+  // Higher refinement = larger erosion radius.
+  let eroded = new Float32Array(prob);
+  for (let pass = 0; pass < erodeRadius; pass++) {
+    const src = eroded;
+    const dst = new Float32Array(mw * mh);
+    for (let y = 0; y < mh; y++) {
+      for (let x = 0; x < mw; x++) {
+        let minV = 1;
+        for (let dy = -erodeRadius; dy <= erodeRadius; dy++) {
+          for (let dx = -erodeRadius; dx <= erodeRadius; dx++) {
+            const nx = Math.min(mw - 1, Math.max(0, x + dx));
+            const ny = Math.min(mh - 1, Math.max(0, y + dy));
+            const v = src[ny * mw + nx];
+            if (v < minV) minV = v;
+          }
         }
+        dst[y * mw + x] = minV;
       }
-      eroded[y * mw + x] = minV;
     }
+    eroded = dst;
   }
 
-  // Box-blur (3x3) twice for smooth feather
+  // Box-blur (3x3) for soft feather; fewer passes when refinement is high
   const blur = (src: Float32Array): Float32Array => {
     const out = new Float32Array(src.length);
     for (let y = 0; y < mh; y++) {
@@ -125,7 +136,10 @@ export async function removeBackground(
     }
     return out;
   };
-  const soft = blur(blur(eroded));
+  let soft = eroded;
+  for (let i = 0; i < featherPasses; i++) {
+    soft = blur(soft);
+  }
 
   // Draw original
   const canvas = document.createElement("canvas");
