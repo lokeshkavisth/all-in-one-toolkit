@@ -243,7 +243,7 @@ export default function PassportPhoto() {
     } finally {
       setAiBusy(null);
     }
-  }, [originalImageSrc, bgReplaceColor, swapImage, toast]);
+  }, [originalImageSrc, bgReplaceColor, edgeRefinement, swapImage, toast]);
 
   /* ──── AI: Restore original photo ──── */
   const handleRestoreOriginal = useCallback(async () => {
