@@ -77,6 +77,10 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
+function isValidHexColor(value: string) {
+  return /^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(value);
+}
+
 type CropMode = "pan" | "select";
 
 export default function PassportPhoto() {
@@ -136,6 +140,10 @@ export default function PassportPhoto() {
   const [bgReplaceColor, setBgReplaceColor] = useState("#FFFFFF");
   const [edgeRefinement, setEdgeRefinement] = useState(50);
   const [aiBusy, setAiBusy] = useState<null | "bg" | "align">(null);
+  const lastAppliedBgSettingsRef = useRef<{
+    color: string;
+    edgeRefinement: number;
+  } | null>(null);
 
   const presetData = PHOTO_PRESETS.find((p) => p.id === presetId)!;
   const preset = presetId === "custom"
@@ -187,6 +195,7 @@ export default function PassportPhoto() {
         setImageSrc(src);
         setOriginalImageSrc(src);
         setBgRemoved(false);
+        lastAppliedBgSettingsRef.current = null;
         setImageSize({ w: img.width, h: img.height });
         setRotation(0);
         setCroppedUrl(null);
@@ -218,7 +227,7 @@ export default function PassportPhoto() {
   }, []);
 
   /* ──── AI: Remove Background (MediaPipe Image Segmenter) ──── */
-  const handleRemoveBackground = useCallback(async () => {
+  const handleRemoveBackground = useCallback(async (options?: { silent?: boolean }) => {
     if (!imgRef.current || !originalImageSrc) return;
     setAiBusy("bg");
     try {
@@ -232,7 +241,13 @@ export default function PassportPhoto() {
       const newSrc = await removeBackground(baseImg, bgReplaceColor, edgeRefinement);
       await swapImage(newSrc);
       setBgRemoved(true);
-      toast({ title: "Background removed", description: "AI segmentation applied" });
+      lastAppliedBgSettingsRef.current = {
+        color: bgReplaceColor.toUpperCase(),
+        edgeRefinement,
+      };
+      if (!options?.silent) {
+        toast({ title: "Background removed", description: "AI segmentation applied" });
+      }
     } catch (err) {
       console.error(err);
       toast({
@@ -250,8 +265,32 @@ export default function PassportPhoto() {
     if (!originalImageSrc) return;
     await swapImage(originalImageSrc);
     setBgRemoved(false);
+    lastAppliedBgSettingsRef.current = null;
     toast({ title: "Original photo restored" });
   }, [originalImageSrc, swapImage, toast]);
+
+  useEffect(() => {
+    if (!bgRemoved || aiBusy !== null || !originalImageSrc || !isValidHexColor(bgReplaceColor)) {
+      return;
+    }
+
+    const nextColor = bgReplaceColor.toUpperCase();
+    const lastApplied = lastAppliedBgSettingsRef.current;
+
+    if (
+      lastApplied &&
+      lastApplied.color === nextColor &&
+      lastApplied.edgeRefinement === edgeRefinement
+    ) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void handleRemoveBackground({ silent: true });
+    }, 180);
+
+    return () => window.clearTimeout(timeout);
+  }, [bgRemoved, aiBusy, originalImageSrc, bgReplaceColor, edgeRefinement, handleRemoveBackground]);
 
   /* ──── AI: Auto-align face (MediaPipe Face Detector) ──── */
   const handleAutoAlign = useCallback(async () => {
@@ -846,7 +885,7 @@ export default function PassportPhoto() {
                       variant="outline"
                       size="sm"
                       className="w-full"
-                      onClick={handleRemoveBackground}
+                      onClick={() => void handleRemoveBackground()}
                       disabled={aiBusy !== null}
                     >
                       {aiBusy === "bg" ? (
