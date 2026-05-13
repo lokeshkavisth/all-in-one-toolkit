@@ -227,7 +227,7 @@ export default function PassportPhoto() {
   }, []);
 
   /* ──── AI: Remove Background (MediaPipe Image Segmenter) ──── */
-  const handleRemoveBackground = useCallback(async () => {
+  const handleRemoveBackground = useCallback(async (options?: { silent?: boolean }) => {
     if (!imgRef.current || !originalImageSrc) return;
     setAiBusy("bg");
     try {
@@ -245,7 +245,9 @@ export default function PassportPhoto() {
         color: bgReplaceColor.toUpperCase(),
         edgeRefinement,
       };
-      toast({ title: "Background removed", description: "AI segmentation applied" });
+      if (!options?.silent) {
+        toast({ title: "Background removed", description: "AI segmentation applied" });
+      }
     } catch (err) {
       console.error(err);
       toast({
@@ -284,7 +286,7 @@ export default function PassportPhoto() {
     }
 
     const timeout = window.setTimeout(() => {
-      void handleRemoveBackground();
+      void handleRemoveBackground({ silent: true });
     }, 180);
 
     return () => window.clearTimeout(timeout);
