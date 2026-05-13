@@ -63,11 +63,70 @@ export async function removeBackground(
   const mask = result.categoryMask;
   if (!mask) throw new Error("Segmentation failed");
 
-  const maskData = mask.getAsUint8Array(); // 0 = background, non-zero = person (selfie segmenter)
+  const maskData = mask.getAsUint8Array();
   const mw = mask.width;
   const mh = mask.height;
 
-  // Draw original image to canvas
+  // Detect mask polarity by sampling center (likely person) vs corners (likely bg)
+  const centerVal = maskData[Math.floor(mh / 2) * mw + Math.floor(mw / 2)];
+  const cornerVal =
+    (maskData[0] +
+      maskData[mw - 1] +
+      maskData[(mh - 1) * mw] +
+      maskData[mh * mw - 1]) /
+    4;
+  // If center value < corner value, then lower = person (selfie segmenter default).
+  const personIsLow = centerVal < cornerVal;
+
+  // Build a Float32 person-probability map at mask resolution: 1 = person, 0 = bg
+  const prob = new Float32Array(mw * mh);
+  for (let i = 0; i < prob.length; i++) {
+    const v = maskData[i] / 255;
+    prob[i] = personIsLow ? 1 - v : v;
+  }
+
+  // Erode slightly + feather: shrink the mask by 1-2 mask px to drop fringe halos,
+  // then blur for soft edges.
+  const eroded = new Float32Array(mw * mh);
+  for (let y = 0; y < mh; y++) {
+    for (let x = 0; x < mw; x++) {
+      let minV = 1;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = Math.min(mw - 1, Math.max(0, x + dx));
+          const ny = Math.min(mh - 1, Math.max(0, y + dy));
+          const v = prob[ny * mw + nx];
+          if (v < minV) minV = v;
+        }
+      }
+      eroded[y * mw + x] = minV;
+    }
+  }
+
+  // Box-blur (3x3) twice for smooth feather
+  const blur = (src: Float32Array): Float32Array => {
+    const out = new Float32Array(src.length);
+    for (let y = 0; y < mh; y++) {
+      for (let x = 0; x < mw; x++) {
+        let s = 0;
+        let c = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= mw || ny >= mh) continue;
+            s += src[ny * mw + nx];
+            c++;
+          }
+        }
+        out[y * mw + x] = s / c;
+      }
+    }
+    return out;
+  };
+  const soft = blur(blur(eroded));
+
+  // Draw original
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -76,68 +135,37 @@ export async function removeBackground(
   const imageData = ctx.getImageData(0, 0, w, h);
   const px = imageData.data;
 
-  // Parse bg color
   const bg = hexToRgb(bgColor);
 
-  // Mask is mw x mh — map by ratio
-  const sx = mw / w;
-  const sy = mh / h;
-
+  // Bilinear sample + alpha blend (decontaminates edges)
   for (let y = 0; y < h; y++) {
-    const my = Math.min(mh - 1, Math.floor(y * sy));
+    const fy = (y / h) * (mh - 1);
+    const y0 = Math.floor(fy);
+    const y1 = Math.min(mh - 1, y0 + 1);
+    const wy = fy - y0;
     for (let x = 0; x < w; x++) {
-      const mx = Math.min(mw - 1, Math.floor(x * sx));
-      const m = maskData[my * mw + mx];
-      // Selfie segmenter: 0 = person, 255 = background (or vice versa per model).
-      // Empirically for selfie_segmenter.tflite category mask, 0 == background.
-      // We'll treat: if value >= 128 -> person (foreground keep), else bg replace.
-      // Some builds invert; detect by checking center pixel later if needed.
-      const isBackground = m < 128;
-      if (isBackground) {
-        const i = (y * w + x) * 4;
-        px[i] = bg.r;
-        px[i + 1] = bg.g;
-        px[i + 2] = bg.b;
-        px[i + 3] = 255;
-      }
+      const fx = (x / w) * (mw - 1);
+      const x0 = Math.floor(fx);
+      const x1 = Math.min(mw - 1, x0 + 1);
+      const wx = fx - x0;
+      const a =
+        soft[y0 * mw + x0] * (1 - wx) * (1 - wy) +
+        soft[y0 * mw + x1] * wx * (1 - wy) +
+        soft[y1 * mw + x0] * (1 - wx) * wy +
+        soft[y1 * mw + x1] * wx * wy;
+
+      // Steepen the curve a bit so soft fringe pulls toward bg
+      const a2 = Math.max(0, Math.min(1, (a - 0.35) / 0.35));
+
+      const i = (y * w + x) * 4;
+      px[i] = px[i] * a2 + bg.r * (1 - a2);
+      px[i + 1] = px[i + 1] * a2 + bg.g * (1 - a2);
+      px[i + 2] = px[i + 2] * a2 + bg.b * (1 - a2);
+      px[i + 3] = 255;
     }
   }
 
-  // Heuristic: if the center pixel was treated as background (very unlikely for a portrait),
-  // invert the mask interpretation.
-  const cx = Math.floor(w / 2);
-  const cy = Math.floor(h / 2);
-  const centerIdx = (cy * w + cx) * 4;
-  const centerWasReplaced =
-    px[centerIdx] === bg.r &&
-    px[centerIdx + 1] === bg.g &&
-    px[centerIdx + 2] === bg.b;
-
-  if (centerWasReplaced) {
-    // Re-render inverted
-    ctx.drawImage(img, 0, 0, w, h);
-    const id2 = ctx.getImageData(0, 0, w, h);
-    const p2 = id2.data;
-    for (let y = 0; y < h; y++) {
-      const my = Math.min(mh - 1, Math.floor(y * sy));
-      for (let x = 0; x < w; x++) {
-        const mx = Math.min(mw - 1, Math.floor(x * sx));
-        const m = maskData[my * mw + mx];
-        const isBackground = m >= 128; // inverted
-        if (isBackground) {
-          const i = (y * w + x) * 4;
-          p2[i] = bg.r;
-          p2[i + 1] = bg.g;
-          p2[i + 2] = bg.b;
-          p2[i + 3] = 255;
-        }
-      }
-    }
-    ctx.putImageData(id2, 0, 0);
-  } else {
-    ctx.putImageData(imageData, 0, 0);
-  }
-
+  ctx.putImageData(imageData, 0, 0);
   mask.close();
 
   return canvas.toDataURL("image/jpeg", 0.95);
