@@ -53,7 +53,8 @@ export async function getFaceDetector() {
  */
 export async function removeBackground(
   img: HTMLImageElement,
-  bgColor: string
+  bgColor: string,
+  edgeRefinement = 50
 ): Promise<string> {
   const segmenter = await getSegmenter();
   const w = img.naturalWidth;
