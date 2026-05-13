@@ -826,6 +826,22 @@ export default function PassportPhoto() {
                         />
                       ))}
                     </div>
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] text-muted-foreground">Edge Refinement</Label>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">{edgeRefinement}%</span>
+                      </div>
+                      <Slider
+                        value={[edgeRefinement]}
+                        onValueChange={([v]) => setEdgeRefinement(v)}
+                        min={0}
+                        max={100}
+                        step={1}
+                      />
+                      <p className="text-[10px] text-muted-foreground leading-snug">
+                        Boost to sharpen edges around hair & shoulders. Lower for softer blending.
+                      </p>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
