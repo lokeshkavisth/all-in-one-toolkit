@@ -134,6 +134,7 @@ export default function PassportPhoto() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [bgRemoved, setBgRemoved] = useState(false);
   const [bgReplaceColor, setBgReplaceColor] = useState("#FFFFFF");
+  const [edgeRefinement, setEdgeRefinement] = useState(50);
   const [aiBusy, setAiBusy] = useState<null | "bg" | "align">(null);
 
   const presetData = PHOTO_PRESETS.find((p) => p.id === presetId)!;
