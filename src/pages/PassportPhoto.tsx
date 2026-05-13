@@ -885,7 +885,7 @@ export default function PassportPhoto() {
                       variant="outline"
                       size="sm"
                       className="w-full"
-                      onClick={handleRemoveBackground}
+                      onClick={() => void handleRemoveBackground()}
                       disabled={aiBusy !== null}
                     >
                       {aiBusy === "bg" ? (
