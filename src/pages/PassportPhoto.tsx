@@ -1,6 +1,16 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer, Sparkles, ScanFace, Loader2, Undo2 } from "lucide-react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer, Sparkles, ScanFace, Loader2, Undo2, Wand2, Sun, Smile, RefreshCw } from "lucide-react";
 import { removeBackground, detectFace } from "@/lib/passport-photo/mediapipe";
+import {
+  autoLighting,
+  smoothSkin,
+  autoFixTilt,
+  buildCSSFilter,
+  applySharpness,
+  FILTER_PRESETS,
+  DEFAULT_ADJUSTMENTS,
+  type Adjustments,
+} from "@/lib/passport-photo/enhance";
 import { ToolPageLayout } from "@/components/ToolPageLayout";
 import { FileUploader } from "@/components/FileUploader";
 import { Button } from "@/components/ui/button";
