@@ -306,10 +306,11 @@ export default function PassportPhoto() {
         });
         return;
       }
-      // MediaPipe face bbox ≈ eyebrows→chin (~60% of full head). Passport guideline:
-      // head ≈ 65-70% of frame, so face bbox should be ≈ 45% of frame for a comfortable fit.
-      const targetFaceFrac = 0.48;
-      const targetCenterYFrac = 0.52;
+      // MediaPipe face bbox ≈ eyebrows→chin (~60% of full head). Frame the
+      // shot so the face occupies ~34% of the crop height — that leaves
+      // visible shoulders below and a small breathing gap above the head.
+      const targetFaceFrac = 0.34;
+      const targetCenterYFrac = 0.42;
 
       const desiredZoom = (CROP_DISPLAY_H * targetFaceFrac) / face.height;
       const newZoomLevel = clamp(desiredZoom / baseScale, 0.5, 4);
