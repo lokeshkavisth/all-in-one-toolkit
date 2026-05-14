@@ -911,6 +911,140 @@ export default function PassportPhoto() {
                   )}
                 </div>
 
+
+                {/* Enhance: one-tap fixes */}
+                <div className="rounded-xl border bg-card p-4 space-y-3">
+                  <div className="flex items-center gap-1.5">
+                    <Wand2 className="h-3.5 w-3.5 text-primary" />
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      One-Tap Enhance
+                    </Label>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={handleAutoTilt}
+                      disabled={aiBusy !== null}
+                    >
+                      {aiBusy === "tilt" ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <ScanFace className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Auto Fix Head Tilt
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={handleAutoLighting}
+                      disabled={aiBusy !== null}
+                    >
+                      {aiBusy === "light" ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Sun className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Auto Lighting Fix
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={handleSmoothSkin}
+                      disabled={aiBusy !== null}
+                    >
+                      {aiBusy === "skin" ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Smile className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Smooth Skin
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    Each fix bakes into the photo. Use Restore Original below to undo.
+                  </p>
+                </div>
+
+                {/* Filter presets */}
+                <div className="rounded-xl border bg-card p-4 space-y-3">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Filters
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {FILTER_PRESETS.map((p) => (
+                      <Button
+                        key={p.id}
+                        variant={activePresetId === p.id ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 px-2.5 text-xs"
+                        onClick={() => applyPreset(p.id)}
+                      >
+                        {p.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Manual adjustments */}
+                <div className="rounded-xl border bg-card p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Adjustments
+                    </Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={resetAdjustments}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" /> Reset
+                    </Button>
+                  </div>
+                  {([
+                    { key: "brightness", label: "Brightness", min: 0, max: 200, base: 100, suffix: "%" },
+                    { key: "contrast",   label: "Contrast",   min: 0, max: 200, base: 100, suffix: "%" },
+                    { key: "saturation", label: "Saturation", min: 0, max: 200, base: 100, suffix: "%" },
+                    { key: "warmth",     label: "Warmth",     min: -100, max: 100, base: 0, suffix: "" },
+                  ] as const).map((s) => (
+                    <div className="space-y-1.5" key={s.key}>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[11px] text-muted-foreground">{s.label}</Label>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          {adjustments[s.key] - s.base > 0 ? "+" : ""}
+                          {adjustments[s.key] - s.base}{s.suffix}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[adjustments[s.key]]}
+                        onValueChange={([v]) => updateAdjustment(s.key, v)}
+                        min={s.min}
+                        max={s.max}
+                        step={1}
+                      />
+                    </div>
+                  ))}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] text-muted-foreground">Sharpness</Label>
+                      <span className="text-[10px] text-muted-foreground tabular-nums">{sharpness}%</span>
+                    </div>
+                    <Slider
+                      value={[sharpness]}
+                      onValueChange={([v]) => { setSharpness(v); setActivePresetId(""); }}
+                      min={0}
+                      max={100}
+                      step={1}
+                    />
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Sharpness is applied to the final cropped photo.
+                    </p>
+                  </div>
+                </div>
+
                 {/* AI Tools (MediaPipe) */}
                 <div className="rounded-xl border bg-card p-4 space-y-3">
                   <div className="flex items-center gap-1.5">
