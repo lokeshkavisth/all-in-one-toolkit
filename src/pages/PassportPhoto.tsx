@@ -363,6 +363,78 @@ export default function PassportPhoto() {
     }
   }, [imageSize, baseScale, CROP_DISPLAY_H, toast]);
 
+  /* ──── Enhancement handlers ──── */
+  const runEnhanceOnImage = useCallback(
+    async (
+      kind: "tilt" | "light" | "skin",
+      processor: (img: HTMLImageElement) => Promise<string | null>
+    ) => {
+      if (!imgRef.current) return;
+      setAiBusy(kind);
+      try {
+        const result = await processor(imgRef.current);
+        if (!result) {
+          toast({
+            title: kind === "tilt" ? "No tilt detected" : "No changes applied",
+            description: kind === "tilt" ? "Your photo already looks level" : "Try a different photo",
+          });
+          return;
+        }
+        await swapImage(result);
+        // Reset bg-removed cache so re-applying bg re-runs on the new pixels.
+        if (bgRemoved) lastAppliedBgSettingsRef.current = null;
+        toast({
+          title:
+            kind === "tilt" ? "Head tilt corrected" :
+            kind === "light" ? "Lighting fixed" :
+            "Skin smoothed",
+        });
+      } catch (err) {
+        console.error(err);
+        toast({
+          title: "Enhancement failed",
+          description: err instanceof Error ? err.message : "Try again",
+          variant: "destructive",
+        });
+      } finally {
+        setAiBusy(null);
+      }
+    },
+    [swapImage, toast, bgRemoved]
+  );
+
+  const handleAutoTilt = useCallback(
+    () => runEnhanceOnImage("tilt", autoFixTilt),
+    [runEnhanceOnImage]
+  );
+  const handleAutoLighting = useCallback(
+    () => runEnhanceOnImage("light", async (img) => autoLighting(img)),
+    [runEnhanceOnImage]
+  );
+  const handleSmoothSkin = useCallback(
+    () => runEnhanceOnImage("skin", async (img) => smoothSkin(img, 60)),
+    [runEnhanceOnImage]
+  );
+
+  const applyPreset = useCallback((id: string) => {
+    const preset = FILTER_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    setActivePresetId(id);
+    setAdjustments(preset.adjustments);
+    setSharpness(preset.sharpness ?? 0);
+  }, []);
+
+  const resetAdjustments = useCallback(() => {
+    setAdjustments(DEFAULT_ADJUSTMENTS);
+    setSharpness(0);
+    setActivePresetId("original");
+  }, []);
+
+  const updateAdjustment = useCallback(<K extends keyof Adjustments>(key: K, value: Adjustments[K]) => {
+    setAdjustments((prev) => ({ ...prev, [key]: value }));
+    setActivePresetId("");
+  }, []);
+
   useEffect(() => {
     if (!imgRef.current) return;
     setZoomLevel(1);
