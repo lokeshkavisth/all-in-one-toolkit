@@ -221,6 +221,9 @@ export default function PassportPhoto() {
         setOffsetX(0);
         setOffsetY(0);
         setSelectBox(null);
+        setAdjustments(DEFAULT_ADJUSTMENTS);
+        setSharpness(0);
+        setActivePresetId("original");
       };
       img.src = src;
     };
