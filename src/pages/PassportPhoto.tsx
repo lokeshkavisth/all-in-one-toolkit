@@ -516,6 +516,9 @@ export default function PassportPhoto() {
     canvas.width = outW;
     canvas.height = outH;
     const ctx = canvas.getContext("2d")!;
+    // Bake brightness/contrast/saturation/warmth as a canvas filter
+    // so the cropped output matches the live preview.
+    ctx.filter = cssFilter;
 
     if (selectBox && selectBox.w > 5 && selectBox.h > 5) {
       const imgDisplayW = imageSize.w * zoom;
@@ -543,6 +546,10 @@ export default function PassportPhoto() {
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
       ctx.restore();
     }
+    ctx.filter = "none";
+
+    // Apply unsharp-mask sharpness to the baked crop.
+    if (sharpness > 0) applySharpness(canvas, sharpness);
 
     // Draw border if enabled
     if (borderEnabled && borderThicknessPx > 0) {
