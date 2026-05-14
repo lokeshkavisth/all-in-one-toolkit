@@ -153,7 +153,7 @@ export async function removeBackground(
   if (!masks || !masks.length) throw new Error("Segmentation failed");
   const mask = masks[0];
 
-  const maskData = mask.getAsFloat32Array();
+  const maskData = new Float32Array(mask.getAsFloat32Array());
   const mw = mask.width;
   const mh = mask.height;
 
