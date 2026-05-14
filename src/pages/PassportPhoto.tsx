@@ -1199,6 +1199,7 @@ export default function PassportPhoto() {
                       transform: `rotate(${rotation}deg)`,
                       transformOrigin: "center center",
                       maxWidth: "none",
+                      filter: cssFilter,
                     }}
                   />
                   {/* Face oval guide */}
