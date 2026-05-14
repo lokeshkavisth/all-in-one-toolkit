@@ -149,11 +149,17 @@ export default function PassportPhoto() {
   const [bgRemoved, setBgRemoved] = useState(false);
   const [bgReplaceColor, setBgReplaceColor] = useState("#FFFFFF");
   const [edgeRefinement, setEdgeRefinement] = useState(50);
-  const [aiBusy, setAiBusy] = useState<null | "bg" | "align">(null);
+  const [aiBusy, setAiBusy] = useState<null | "bg" | "align" | "tilt" | "light" | "skin">(null);
   const lastAppliedBgSettingsRef = useRef<{
     color: string;
     edgeRefinement: number;
   } | null>(null);
+
+  // Enhancement / filters
+  const [adjustments, setAdjustments] = useState<Adjustments>(DEFAULT_ADJUSTMENTS);
+  const [sharpness, setSharpness] = useState(0); // 0..100, baked at crop time
+  const [activePresetId, setActivePresetId] = useState<string>("original");
+  const cssFilter = useMemo(() => buildCSSFilter(adjustments), [adjustments]);
 
   const presetData = PHOTO_PRESETS.find((p) => p.id === presetId)!;
   const preset = presetId === "custom"
