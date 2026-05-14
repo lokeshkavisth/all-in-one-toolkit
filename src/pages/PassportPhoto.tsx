@@ -569,7 +569,7 @@ export default function PassportPhoto() {
       "image/jpeg",
       0.95
     );
-  }, [zoom, offsetX, offsetY, rotation, preset, imageSize, selectBox, borderEnabled, borderColor, borderThicknessPx, CROP_DISPLAY_W, CROP_DISPLAY_H, toast]);
+  }, [zoom, offsetX, offsetY, rotation, preset, imageSize, selectBox, borderEnabled, borderColor, borderThicknessPx, CROP_DISPLAY_W, CROP_DISPLAY_H, cssFilter, sharpness, toast]);
 
   /* ──── Render page preview ──── */
   const renderPagePreview = (pageIndex: number) => {
