@@ -187,7 +187,7 @@ export async function removeBackground(
   const k = 6 + ref * 0.18; // 6..24
   const t = 0.5; // midpoint
 
-  let field = prob;
+  let field: Float32Array = prob;
   if (erodeR > 0) field = erodeSep(field, mw, mh, erodeR);
   field = gaussianBlur(field, mw, mh, blurR);
 
