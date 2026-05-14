@@ -23,11 +23,14 @@ export async function getSegmenter() {
   if (!segmenterPromise) {
     segmenterPromise = (async () => {
       const fileset = await getVisionFileset();
+      // Confidence masks give a smooth Float32 probability per pixel,
+      // which produces dramatically cleaner edges than the binary
+      // category mask (especially around hair).
       return ImageSegmenter.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: SEGMENTER_MODEL, delegate: "GPU" },
         runningMode: "IMAGE",
-        outputCategoryMask: true,
-        outputConfidenceMasks: false,
+        outputCategoryMask: false,
+        outputConfidenceMasks: true,
       });
     })();
   }
@@ -47,9 +50,94 @@ export async function getFaceDetector() {
   return faceDetectorPromise;
 }
 
+/* ──────────── Fast image-processing helpers ──────────── */
+
+// Separable horizontal/vertical box blur — O(w*h) per pass, vs O(w*h*r²)
+// for a naive 2D blur. Two box passes ≈ a Gaussian.
+function boxBlurH(src: Float32Array, dst: Float32Array, w: number, h: number, r: number) {
+  const inv = 1 / (r * 2 + 1);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sum = 0;
+    for (let x = -r; x <= r; x++) sum += src[row + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      dst[row + x] = sum * inv;
+      const xAdd = Math.min(w - 1, x + r + 1);
+      const xSub = Math.max(0, x - r);
+      sum += src[row + xAdd] - src[row + xSub];
+    }
+  }
+}
+
+function boxBlurV(src: Float32Array, dst: Float32Array, w: number, h: number, r: number) {
+  const inv = 1 / (r * 2 + 1);
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let y = -r; y <= r; y++) sum += src[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      dst[y * w + x] = sum * inv;
+      const yAdd = Math.min(h - 1, y + r + 1);
+      const ySub = Math.max(0, y - r);
+      sum += src[yAdd * w + x] - src[ySub * w + x];
+    }
+  }
+}
+
+function gaussianBlur(src: Float32Array, w: number, h: number, radius: number): Float32Array {
+  if (radius < 1) return src;
+  const tmp = new Float32Array(src.length);
+  const out = new Float32Array(src.length);
+  boxBlurH(src, tmp, w, h, radius);
+  boxBlurV(tmp, out, w, h, radius);
+  return out;
+}
+
+// Separable min-filter (erosion) — O(w*h*r) total instead of O(w*h*r²).
+function erodeSep(src: Float32Array, w: number, h: number, r: number): Float32Array {
+  if (r < 1) return src;
+  const tmp = new Float32Array(src.length);
+  // horizontal min
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      let m = 1;
+      const x0 = Math.max(0, x - r);
+      const x1 = Math.min(w - 1, x + r);
+      for (let i = x0; i <= x1; i++) {
+        const v = src[row + i];
+        if (v < m) m = v;
+      }
+      tmp[row + x] = m;
+    }
+  }
+  const out = new Float32Array(src.length);
+  // vertical min
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      let m = 1;
+      const y0 = Math.max(0, y - r);
+      const y1 = Math.min(h - 1, y + r);
+      for (let i = y0; i <= y1; i++) {
+        const v = tmp[i * w + x];
+        if (v < m) m = v;
+      }
+      out[y * w + x] = m;
+    }
+  }
+  return out;
+}
+
 /**
  * Replace background of a loaded HTMLImageElement with a solid color.
- * Returns a new data URL (JPEG).
+ * Returns a JPEG data URL.
+ *
+ * Pipeline (operates on the small mediapipe mask, then upsamples):
+ *   1. Read confidence mask (smooth Float32 probability per pixel).
+ *   2. Detect polarity (which class is the person).
+ *   3. Light Gaussian smoothing of the probability field.
+ *   4. Optional erosion to clip halos when edgeRefinement is high.
+ *   5. Sigmoid-like remap to crush soft fringe pixels toward 0/1.
+ *   6. Bilinear upsample + per-channel composite onto the bg color.
  */
 export async function removeBackground(
   img: HTMLImageElement,
@@ -61,87 +149,56 @@ export async function removeBackground(
   const h = img.naturalHeight;
 
   const result = segmenter.segment(img);
-  const mask = result.categoryMask;
-  if (!mask) throw new Error("Segmentation failed");
+  const masks = result.confidenceMasks;
+  if (!masks || !masks.length) throw new Error("Segmentation failed");
+  const mask = masks[0];
 
-  const maskData = mask.getAsUint8Array();
+  const maskData = mask.getAsFloat32Array();
   const mw = mask.width;
   const mh = mask.height;
 
-  // Detect mask polarity by sampling center (likely person) vs corners (likely bg)
-  const centerVal = maskData[Math.floor(mh / 2) * mw + Math.floor(mw / 2)];
+  // Detect polarity: confidence mask convention varies by model build.
+  // Sample center vs corners — whichever is higher is the foreground class.
+  const cIdx = Math.floor(mh / 2) * mw + Math.floor(mw / 2);
+  const centerVal = maskData[cIdx];
   const cornerVal =
     (maskData[0] +
       maskData[mw - 1] +
       maskData[(mh - 1) * mw] +
       maskData[mh * mw - 1]) /
     4;
-  // If center value < corner value, then lower = person (selfie segmenter default).
-  const personIsLow = centerVal < cornerVal;
+  const personIsHigh = centerVal >= cornerVal;
 
-  // Build a Float32 person-probability map at mask resolution: 1 = person, 0 = bg
+  // Build a person-probability field (1 = person, 0 = bg).
   const prob = new Float32Array(mw * mh);
-  for (let i = 0; i < prob.length; i++) {
-    const v = maskData[i] / 255;
-    prob[i] = personIsLow ? 1 - v : v;
+  if (personIsHigh) {
+    for (let i = 0; i < prob.length; i++) prob[i] = maskData[i];
+  } else {
+    for (let i = 0; i < prob.length; i++) prob[i] = 1 - maskData[i];
   }
 
-  // Edge-refinement params
-  const erodeRadius = edgeRefinement < 35 ? 1 : edgeRefinement < 70 ? 2 : 3;
-  const featherPasses = edgeRefinement > 75 ? 1 : 2;
-  const alphaBase = Math.max(0.1, 0.35 - edgeRefinement * 0.002);
-  const alphaDiv  = Math.max(0.08, 0.35 - edgeRefinement * 0.0025);
+  // Edge-refinement parameters.
+  // Higher refinement -> stronger erosion + sharper sigmoid.
+  const ref = Math.max(0, Math.min(100, edgeRefinement));
+  const erodeR = ref < 25 ? 0 : ref < 60 ? 1 : ref < 85 ? 2 : 3;
+  // A small Gaussian blur smooths jagged segmenter edges before remap.
+  const blurR = ref > 80 ? 1 : 2;
+  // Sigmoid steepness — rises with refinement so soft fringe collapses.
+  const k = 6 + ref * 0.18; // 6..24
+  const t = 0.5; // midpoint
 
-  // Erode: shrink the mask inward to clip hair/shoulder halos.
-  // Higher refinement = larger erosion radius.
-  let eroded = new Float32Array(prob);
-  for (let pass = 0; pass < erodeRadius; pass++) {
-    const src = eroded;
-    const dst = new Float32Array(mw * mh);
-    for (let y = 0; y < mh; y++) {
-      for (let x = 0; x < mw; x++) {
-        let minV = 1;
-        for (let dy = -erodeRadius; dy <= erodeRadius; dy++) {
-          for (let dx = -erodeRadius; dx <= erodeRadius; dx++) {
-            const nx = Math.min(mw - 1, Math.max(0, x + dx));
-            const ny = Math.min(mh - 1, Math.max(0, y + dy));
-            const v = src[ny * mw + nx];
-            if (v < minV) minV = v;
-          }
-        }
-        dst[y * mw + x] = minV;
-      }
-    }
-    eroded = dst;
+  let field = prob;
+  if (erodeR > 0) field = erodeSep(field, mw, mh, erodeR);
+  field = gaussianBlur(field, mw, mh, blurR);
+
+  // Sigmoid remap: crushes fringe alpha toward 0 or 1 in one pass.
+  const alpha = new Float32Array(mw * mh);
+  for (let i = 0; i < alpha.length; i++) {
+    const v = 1 / (1 + Math.exp(-k * (field[i] - t)));
+    alpha[i] = v;
   }
 
-  // Box-blur (3x3) for soft feather; fewer passes when refinement is high
-  const blur = (src: Float32Array): Float32Array => {
-    const out = new Float32Array(src.length);
-    for (let y = 0; y < mh; y++) {
-      for (let x = 0; x < mw; x++) {
-        let s = 0;
-        let c = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = x + dx;
-            const ny = y + dy;
-            if (nx < 0 || ny < 0 || nx >= mw || ny >= mh) continue;
-            s += src[ny * mw + nx];
-            c++;
-          }
-        }
-        out[y * mw + x] = s / c;
-      }
-    }
-    return out;
-  };
-  let soft: Float32Array = eroded;
-  for (let i = 0; i < featherPasses; i++) {
-    soft = blur(soft);
-  }
-
-  // Draw original
+  // Composite onto the bg color at full image resolution with bilinear sampling.
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -149,34 +206,35 @@ export async function removeBackground(
   ctx.drawImage(img, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
   const px = imageData.data;
-
   const bg = hexToRgb(bgColor);
 
-  // Bilinear sample + alpha blend (decontaminates edges)
+  const sx = (mw - 1) / w;
+  const sy = (mh - 1) / h;
+
   for (let y = 0; y < h; y++) {
-    const fy = (y / h) * (mh - 1);
+    const fy = y * sy;
     const y0 = Math.floor(fy);
     const y1 = Math.min(mh - 1, y0 + 1);
     const wy = fy - y0;
+    const row0 = y0 * mw;
+    const row1 = y1 * mw;
     for (let x = 0; x < w; x++) {
-      const fx = (x / w) * (mw - 1);
+      const fx = x * sx;
       const x0 = Math.floor(fx);
       const x1 = Math.min(mw - 1, x0 + 1);
       const wx = fx - x0;
+
       const a =
-        soft[y0 * mw + x0] * (1 - wx) * (1 - wy) +
-        soft[y0 * mw + x1] * wx * (1 - wy) +
-        soft[y1 * mw + x0] * (1 - wx) * wy +
-        soft[y1 * mw + x1] * wx * wy;
+        alpha[row0 + x0] * (1 - wx) * (1 - wy) +
+        alpha[row0 + x1] * wx * (1 - wy) +
+        alpha[row1 + x0] * (1 - wx) * wy +
+        alpha[row1 + x1] * wx * wy;
 
-      // Steepen the curve so soft fringe pulls toward bg.
-      // Higher edgeRefinement = lower threshold + steeper slope = sharper edges.
-      const a2 = Math.max(0, Math.min(1, (a - alphaBase) / alphaDiv));
-
+      const inv = 1 - a;
       const i = (y * w + x) * 4;
-      px[i] = px[i] * a2 + bg.r * (1 - a2);
-      px[i + 1] = px[i + 1] * a2 + bg.g * (1 - a2);
-      px[i + 2] = px[i + 2] * a2 + bg.b * (1 - a2);
+      px[i]     = px[i]     * a + bg.r * inv;
+      px[i + 1] = px[i + 1] * a + bg.g * inv;
+      px[i + 2] = px[i + 2] * a + bg.b * inv;
       px[i + 3] = 255;
     }
   }
