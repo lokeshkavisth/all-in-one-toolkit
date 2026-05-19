@@ -989,8 +989,10 @@ export default function PassportPhoto() {
                     </div>
                   )}
                 </div>
+                  </TabsContent>
 
-
+                  {/* ── ENHANCE TAB: One-Tap + Filters + Adjustments ── */}
+                  <TabsContent value="enhance" className="space-y-3 mt-3">
                 {/* Enhance: one-tap fixes */}
                 <div className="rounded-xl border bg-card p-4 space-y-3">
                   <div className="flex items-center gap-1.5">
