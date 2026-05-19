@@ -1137,7 +1137,10 @@ export default function PassportPhoto() {
                     </p>
                   </div>
                 </div>
+                  </TabsContent>
 
+                  {/* ── AI TAB: Auto Align + Background Remove ── */}
+                  <TabsContent value="ai" className="space-y-3 mt-3">
                 {/* AI Tools (MediaPipe) */}
                 <div className="rounded-xl border bg-card p-4 space-y-3">
                   <div className="flex items-center gap-1.5">
