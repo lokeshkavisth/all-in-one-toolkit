@@ -995,11 +995,23 @@ export default function PassportPhoto() {
                   <TabsContent value="enhance" className="space-y-3 mt-3">
                 {/* Enhance: one-tap fixes */}
                 <div className="rounded-xl border bg-card p-4 space-y-3">
-                  <div className="flex items-center gap-1.5">
-                    <Wand2 className="h-3.5 w-3.5 text-primary" />
-                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      One-Tap Enhance
-                    </Label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Wand2 className="h-3.5 w-3.5 text-primary" />
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        One-Tap Enhance
+                      </Label>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={handleRestoreOriginal}
+                      disabled={aiBusy !== null || !originalImageSrc}
+                      title="Restore the originally uploaded photo"
+                    >
+                      <Undo2 className="h-3 w-3 mr-1" /> Reset
+                    </Button>
                   </div>
                   <div className="grid grid-cols-1 gap-2">
                     <Button
@@ -1046,7 +1058,7 @@ export default function PassportPhoto() {
                     </Button>
                   </div>
                   <p className="text-[10px] text-muted-foreground leading-snug">
-                    Each fix bakes into the photo. Use Restore Original below to undo.
+                    Each fix bakes into the photo. Tap Reset to restore the original upload.
                   </p>
                 </div>
 
