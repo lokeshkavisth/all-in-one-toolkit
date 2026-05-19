@@ -1523,6 +1523,7 @@ export default function PassportPhoto() {
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />
-    </ToolPageLayout>
+      </ToolPageLayout>
+    </>
   );
 }
