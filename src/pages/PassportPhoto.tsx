@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer, Sparkles, ScanFace, Loader2, Undo2, Wand2, Sun, Smile, RefreshCw } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer, Sparkles, ScanFace, Loader2, Undo2, Wand2, Sun, Smile, RefreshCw, Ruler, SlidersHorizontal } from "lucide-react";
 import { removeBackground, detectFace } from "@/lib/passport-photo/mediapipe";
 import {
   autoLighting,
@@ -19,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 /* ──── Unit helpers ──── */
@@ -93,6 +95,44 @@ function isValidHexColor(value: string) {
 
 type CropMode = "pan" | "select";
 
+/* ──── Per-user settings persistence (localStorage) ──── */
+const SETTINGS_KEY = "passport-photo.settings.v1";
+
+interface PersistedSettings {
+  sizeUnit: SizeUnit;
+  presetId: string;
+  customW: number;
+  customH: number;
+  pageSizeId: string;
+  quantity: number;
+  showCutLines: boolean;
+  borderEnabled: boolean;
+  borderColor: string;
+  borderThicknessPx: number;
+  customCols: number;
+  customRows: number;
+  gapMM: number;
+  marginMM: number;
+  bgReplaceColor: string;
+  edgeRefinement: number;
+}
+
+function loadSettings(): Partial<PersistedSettings> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+const SAVED = loadSettings();
+const pick = <K extends keyof PersistedSettings>(key: K, fallback: PersistedSettings[K]): PersistedSettings[K] =>
+  (SAVED[key] !== undefined ? (SAVED[key] as PersistedSettings[K]) : fallback);
+
+
 export default function PassportPhoto() {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -100,7 +140,7 @@ export default function PassportPhoto() {
   const imgRef = useRef<HTMLImageElement | null>(null);
 
   // Unit
-  const [sizeUnit, setSizeUnit] = useState<SizeUnit>("inch");
+  const [sizeUnit, setSizeUnit] = useState<SizeUnit>(pick("sizeUnit", "inch"));
 
   // Image state
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -120,24 +160,24 @@ export default function PassportPhoto() {
   const [selectBox, setSelectBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [selectStart, setSelectStart] = useState<{ x: number; y: number } | null>(null);
 
-  // Settings
-  const [presetId, setPresetId] = useState("us");
-  const [customW, setCustomW] = useState(35);
-  const [customH, setCustomH] = useState(45);
-  const [pageSizeId, setPageSizeId] = useState("a4");
-  const [quantity, setQuantity] = useState(8);
-  const [showCutLines, setShowCutLines] = useState(true);
+  // Settings (persisted)
+  const [presetId, setPresetId] = useState(pick("presetId", "us"));
+  const [customW, setCustomW] = useState(pick("customW", 35));
+  const [customH, setCustomH] = useState(pick("customH", 45));
+  const [pageSizeId, setPageSizeId] = useState(pick("pageSizeId", "a4"));
+  const [quantity, setQuantity] = useState(pick("quantity", 8));
+  const [showCutLines, setShowCutLines] = useState(pick("showCutLines", true));
 
-  // Border settings
-  const [borderEnabled, setBorderEnabled] = useState(true);
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [borderThicknessPx, setBorderThicknessPx] = useState(3); // in px
+  // Border settings (persisted)
+  const [borderEnabled, setBorderEnabled] = useState(pick("borderEnabled", true));
+  const [borderColor, setBorderColor] = useState(pick("borderColor", "#000000"));
+  const [borderThicknessPx, setBorderThicknessPx] = useState(pick("borderThicknessPx", 3));
 
-  // Layout controls
-  const [customCols, setCustomCols] = useState(5);
-  const [customRows, setCustomRows] = useState(0); // 0 = auto
-  const [gapMM, setGapMM] = useState(4);
-  const [marginMM, setMarginMM] = useState(5);
+  // Layout controls (persisted)
+  const [customCols, setCustomCols] = useState(pick("customCols", 5));
+  const [customRows, setCustomRows] = useState(pick("customRows", 0));
+  const [gapMM, setGapMM] = useState(pick("gapMM", 4));
+  const [marginMM, setMarginMM] = useState(pick("marginMM", 5));
 
   // Result
   const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
@@ -147,13 +187,33 @@ export default function PassportPhoto() {
   // AI features (MediaPipe, runs fully in-browser via WASM)
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [bgRemoved, setBgRemoved] = useState(false);
-  const [bgReplaceColor, setBgReplaceColor] = useState("#FFFFFF");
-  const [edgeRefinement, setEdgeRefinement] = useState(50);
+  const [bgReplaceColor, setBgReplaceColor] = useState(pick("bgReplaceColor", "#FFFFFF"));
+  const [edgeRefinement, setEdgeRefinement] = useState(pick("edgeRefinement", 50));
   const [aiBusy, setAiBusy] = useState<null | "bg" | "align" | "tilt" | "light" | "skin">(null);
   const lastAppliedBgSettingsRef = useRef<{
     color: string;
     edgeRefinement: number;
   } | null>(null);
+
+  // Persist settings whenever they change.
+  useEffect(() => {
+    const settings: PersistedSettings = {
+      sizeUnit, presetId, customW, customH, pageSizeId, quantity, showCutLines,
+      borderEnabled, borderColor, borderThicknessPx,
+      customCols, customRows, gapMM, marginMM,
+      bgReplaceColor, edgeRefinement,
+    };
+    try {
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch {
+      /* quota / private mode — ignore */
+    }
+  }, [
+    sizeUnit, presetId, customW, customH, pageSizeId, quantity, showCutLines,
+    borderEnabled, borderColor, borderThicknessPx,
+    customCols, customRows, gapMM, marginMM,
+    bgReplaceColor, edgeRefinement,
+  ]);
 
   // Enhancement / filters
   const [adjustments, setAdjustments] = useState<Adjustments>(DEFAULT_ADJUSTMENTS);
@@ -554,11 +614,18 @@ export default function PassportPhoto() {
     // Apply unsharp-mask sharpness to the baked crop.
     if (sharpness > 0) applySharpness(canvas, sharpness);
 
-    // Draw border if enabled
+    // Draw border if enabled.
+    // Use fillRect strips instead of strokeRect for pixel-perfect, fully
+    // inside-canvas borders that render identically across Chrome, Safari,
+    // Firefox, and Edge (some browsers offset stroke by half a pixel and
+    // produce uneven edges, especially after ctx.filter use).
     if (borderEnabled && borderThicknessPx > 0) {
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = borderThicknessPx;
-      ctx.strokeRect(borderThicknessPx / 2, borderThicknessPx / 2, outW - borderThicknessPx, outH - borderThicknessPx);
+      const t = Math.min(borderThicknessPx, Math.floor(Math.min(outW, outH) / 2));
+      ctx.fillStyle = borderColor;
+      ctx.fillRect(0, 0, outW, t);                  // top
+      ctx.fillRect(0, outH - t, outW, t);           // bottom
+      ctx.fillRect(0, 0, t, outH);                  // left
+      ctx.fillRect(outW - t, 0, t, outH);           // right
     }
 
     canvas.toBlob(
@@ -724,13 +791,35 @@ export default function PassportPhoto() {
 
   /* ──── UI ──── */
   return (
-    <ToolPageLayout
-      title="Passport Photo Maker"
-      description="Create standard passport-size photos and arrange them on printable sheets"
-      icon={Camera}
-      category="image"
-      categoryLabel="Image Tools"
-    >
+    <>
+      <Helmet>
+        <title>Free Passport Photo Maker — Online, In-Browser | AllTools Pro</title>
+        <meta
+          name="description"
+          content="Free online passport photo maker. Auto face alignment, background removal, color presets, and print-ready PDFs in seconds. 100% browser-based, no upload required."
+        />
+        <link rel="canonical" href="/tools/passport-photo" />
+        <meta property="og:title" content="Free Passport Photo Maker — AllTools Pro" />
+        <meta property="og:description" content="Create print-ready passport photos online. Auto-align, background remove, and download in seconds." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="/tools/passport-photo" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "Passport Photo Maker",
+          applicationCategory: "PhotographyApplication",
+          operatingSystem: "Any (Web Browser)",
+          offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        })}</script>
+      </Helmet>
+      <ToolPageLayout
+        title="Passport Photo Maker"
+        description="Create standard passport-size photos and arrange them on printable sheets"
+        icon={Camera}
+        category="image"
+        categoryLabel="Image Tools"
+      >
       {!imageSrc ? (
         <FileUploader
           accept="image/*"
@@ -739,9 +828,9 @@ export default function PassportPhoto() {
           description="Supports JPG, PNG, WebP — Max 20MB"
         />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
           {/* ── LEFT CONTROLS ── */}
-          <div className="space-y-4 order-2 lg:order-1 max-h-[80vh] overflow-y-auto pr-1">
+          <div className="space-y-4 order-2 lg:order-1 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto pr-1">
             {/* Unit Selector */}
             <div className="rounded-xl border bg-card p-4 space-y-3">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -813,6 +902,15 @@ export default function PassportPhoto() {
 
             {step === "crop" ? (
               <>
+                <Tabs defaultValue="crop" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 h-9">
+                    <TabsTrigger value="crop" className="text-xs"><Crop className="h-3.5 w-3.5 mr-1" />Crop</TabsTrigger>
+                    <TabsTrigger value="enhance" className="text-xs"><SlidersHorizontal className="h-3.5 w-3.5 mr-1" />Enhance</TabsTrigger>
+                    <TabsTrigger value="ai" className="text-xs"><Sparkles className="h-3.5 w-3.5 mr-1" />AI</TabsTrigger>
+                  </TabsList>
+
+                  {/* ── CROP TAB: Mode + Adjust + Border ── */}
+                  <TabsContent value="crop" className="space-y-3 mt-3">
                 {/* Crop Mode Toggle */}
                 <div className="rounded-xl border bg-card p-4 space-y-3">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -913,15 +1011,29 @@ export default function PassportPhoto() {
                     </div>
                   )}
                 </div>
+                  </TabsContent>
 
-
+                  {/* ── ENHANCE TAB: One-Tap + Filters + Adjustments ── */}
+                  <TabsContent value="enhance" className="space-y-3 mt-3">
                 {/* Enhance: one-tap fixes */}
                 <div className="rounded-xl border bg-card p-4 space-y-3">
-                  <div className="flex items-center gap-1.5">
-                    <Wand2 className="h-3.5 w-3.5 text-primary" />
-                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      One-Tap Enhance
-                    </Label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Wand2 className="h-3.5 w-3.5 text-primary" />
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        One-Tap Enhance
+                      </Label>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={handleRestoreOriginal}
+                      disabled={aiBusy !== null || !originalImageSrc}
+                      title="Restore the originally uploaded photo"
+                    >
+                      <Undo2 className="h-3 w-3 mr-1" /> Reset
+                    </Button>
                   </div>
                   <div className="grid grid-cols-1 gap-2">
                     <Button
@@ -968,7 +1080,7 @@ export default function PassportPhoto() {
                     </Button>
                   </div>
                   <p className="text-[10px] text-muted-foreground leading-snug">
-                    Each fix bakes into the photo. Use Restore Original below to undo.
+                    Each fix bakes into the photo. Tap Reset to restore the original upload.
                   </p>
                 </div>
 
@@ -1047,7 +1159,10 @@ export default function PassportPhoto() {
                     </p>
                   </div>
                 </div>
+                  </TabsContent>
 
+                  {/* ── AI TAB: Auto Align + Background Remove ── */}
+                  <TabsContent value="ai" className="space-y-3 mt-3">
                 {/* AI Tools (MediaPipe) */}
                 <div className="rounded-xl border bg-card p-4 space-y-3">
                   <div className="flex items-center gap-1.5">
@@ -1145,6 +1260,8 @@ export default function PassportPhoto() {
                     Powered by MediaPipe — runs entirely in your browser. First use downloads ~5MB models.
                   </p>
                 </div>
+                  </TabsContent>
+                </Tabs>
 
                 {/* Crop button */}
                 <Button onClick={doCrop} className="w-full" size="lg">
@@ -1406,6 +1523,7 @@ export default function PassportPhoto() {
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />
-    </ToolPageLayout>
+      </ToolPageLayout>
+    </>
   );
 }
