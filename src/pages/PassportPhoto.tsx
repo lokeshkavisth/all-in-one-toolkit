@@ -1238,6 +1238,8 @@ export default function PassportPhoto() {
                     Powered by MediaPipe — runs entirely in your browser. First use downloads ~5MB models.
                   </p>
                 </div>
+                  </TabsContent>
+                </Tabs>
 
                 {/* Crop button */}
                 <Button onClick={doCrop} className="w-full" size="lg">
