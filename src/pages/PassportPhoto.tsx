@@ -554,11 +554,18 @@ export default function PassportPhoto() {
     // Apply unsharp-mask sharpness to the baked crop.
     if (sharpness > 0) applySharpness(canvas, sharpness);
 
-    // Draw border if enabled
+    // Draw border if enabled.
+    // Use fillRect strips instead of strokeRect for pixel-perfect, fully
+    // inside-canvas borders that render identically across Chrome, Safari,
+    // Firefox, and Edge (some browsers offset stroke by half a pixel and
+    // produce uneven edges, especially after ctx.filter use).
     if (borderEnabled && borderThicknessPx > 0) {
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = borderThicknessPx;
-      ctx.strokeRect(borderThicknessPx / 2, borderThicknessPx / 2, outW - borderThicknessPx, outH - borderThicknessPx);
+      const t = Math.min(borderThicknessPx, Math.floor(Math.min(outW, outH) / 2));
+      ctx.fillStyle = borderColor;
+      ctx.fillRect(0, 0, outW, t);                  // top
+      ctx.fillRect(0, outH - t, outW, t);           // bottom
+      ctx.fillRect(0, 0, t, outH);                  // left
+      ctx.fillRect(outW - t, 0, t, outH);           // right
     }
 
     canvas.toBlob(
