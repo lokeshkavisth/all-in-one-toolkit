@@ -791,13 +791,35 @@ export default function PassportPhoto() {
 
   /* ──── UI ──── */
   return (
-    <ToolPageLayout
-      title="Passport Photo Maker"
-      description="Create standard passport-size photos and arrange them on printable sheets"
-      icon={Camera}
-      category="image"
-      categoryLabel="Image Tools"
-    >
+    <>
+      <Helmet>
+        <title>Free Passport Photo Maker — Online, In-Browser | AllTools Pro</title>
+        <meta
+          name="description"
+          content="Free online passport photo maker. Auto face alignment, background removal, color presets, and print-ready PDFs in seconds. 100% browser-based, no upload required."
+        />
+        <link rel="canonical" href="/tools/passport-photo" />
+        <meta property="og:title" content="Free Passport Photo Maker — AllTools Pro" />
+        <meta property="og:description" content="Create print-ready passport photos online. Auto-align, background remove, and download in seconds." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="/tools/passport-photo" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "Passport Photo Maker",
+          applicationCategory: "PhotographyApplication",
+          operatingSystem: "Any (Web Browser)",
+          offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        })}</script>
+      </Helmet>
+      <ToolPageLayout
+        title="Passport Photo Maker"
+        description="Create standard passport-size photos and arrange them on printable sheets"
+        icon={Camera}
+        category="image"
+        categoryLabel="Image Tools"
+      >
       {!imageSrc ? (
         <FileUploader
           accept="image/*"
@@ -806,9 +828,9 @@ export default function PassportPhoto() {
           description="Supports JPG, PNG, WebP — Max 20MB"
         />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
           {/* ── LEFT CONTROLS ── */}
-          <div className="space-y-4 order-2 lg:order-1 max-h-[80vh] overflow-y-auto pr-1">
+          <div className="space-y-4 order-2 lg:order-1 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto pr-1">
             {/* Unit Selector */}
             <div className="rounded-xl border bg-card p-4 space-y-3">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
