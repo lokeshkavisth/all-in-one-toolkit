@@ -46,6 +46,14 @@ export default function Index() {
 
   return (
     <div className="flex flex-col">
+      <Helmet>
+        <title>AllTools Pro — Free Online PDF & Image Tools</title>
+        <meta name="description" content="Free, fast online tools for PDFs and images: passport photo maker, image compressor, cropper, background remover, and more. No signup, runs in your browser." />
+        <link rel="canonical" href="/" />
+        <meta property="og:title" content="AllTools Pro — Free Online PDF & Image Tools" />
+        <meta property="og:description" content="Free, fast online tools for PDFs and images." />
+        <meta property="og:url" content="/" />
+      </Helmet>
       {/* Hero */}
       <section className="py-16 md:py-24 text-center">
         <div className="container max-w-3xl">
