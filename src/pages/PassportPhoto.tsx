@@ -880,6 +880,15 @@ export default function PassportPhoto() {
 
             {step === "crop" ? (
               <>
+                <Tabs defaultValue="crop" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 h-9">
+                    <TabsTrigger value="crop" className="text-xs"><Crop className="h-3.5 w-3.5 mr-1" />Crop</TabsTrigger>
+                    <TabsTrigger value="enhance" className="text-xs"><SlidersHorizontal className="h-3.5 w-3.5 mr-1" />Enhance</TabsTrigger>
+                    <TabsTrigger value="ai" className="text-xs"><Sparkles className="h-3.5 w-3.5 mr-1" />AI</TabsTrigger>
+                  </TabsList>
+
+                  {/* ── CROP TAB: Mode + Adjust + Border ── */}
+                  <TabsContent value="crop" className="space-y-3 mt-3">
                 {/* Crop Mode Toggle */}
                 <div className="rounded-xl border bg-card p-4 space-y-3">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
