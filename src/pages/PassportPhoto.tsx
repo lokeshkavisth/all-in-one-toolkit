@@ -95,6 +95,44 @@ function isValidHexColor(value: string) {
 
 type CropMode = "pan" | "select";
 
+/* ──── Per-user settings persistence (localStorage) ──── */
+const SETTINGS_KEY = "passport-photo.settings.v1";
+
+interface PersistedSettings {
+  sizeUnit: SizeUnit;
+  presetId: string;
+  customW: number;
+  customH: number;
+  pageSizeId: string;
+  quantity: number;
+  showCutLines: boolean;
+  borderEnabled: boolean;
+  borderColor: string;
+  borderThicknessPx: number;
+  customCols: number;
+  customRows: number;
+  gapMM: number;
+  marginMM: number;
+  bgReplaceColor: string;
+  edgeRefinement: number;
+}
+
+function loadSettings(): Partial<PersistedSettings> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+const SAVED = loadSettings();
+const pick = <K extends keyof PersistedSettings>(key: K, fallback: PersistedSettings[K]): PersistedSettings[K] =>
+  (SAVED[key] !== undefined ? (SAVED[key] as PersistedSettings[K]) : fallback);
+
+
 export default function PassportPhoto() {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
