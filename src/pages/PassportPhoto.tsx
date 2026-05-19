@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer, Sparkles, ScanFace, Loader2, Undo2, Wand2, Sun, Smile, RefreshCw } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { Camera, Download, Plus, Minus, RotateCw, ZoomIn, ZoomOut, Crop, Move, Printer, Sparkles, ScanFace, Loader2, Undo2, Wand2, Sun, Smile, RefreshCw, Ruler, SlidersHorizontal } from "lucide-react";
 import { removeBackground, detectFace } from "@/lib/passport-photo/mediapipe";
 import {
   autoLighting,
@@ -19,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 /* ──── Unit helpers ──── */
