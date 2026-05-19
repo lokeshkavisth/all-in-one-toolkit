@@ -140,7 +140,7 @@ export default function PassportPhoto() {
   const imgRef = useRef<HTMLImageElement | null>(null);
 
   // Unit
-  const [sizeUnit, setSizeUnit] = useState<SizeUnit>("inch");
+  const [sizeUnit, setSizeUnit] = useState<SizeUnit>(pick("sizeUnit", "inch"));
 
   // Image state
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -160,24 +160,24 @@ export default function PassportPhoto() {
   const [selectBox, setSelectBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [selectStart, setSelectStart] = useState<{ x: number; y: number } | null>(null);
 
-  // Settings
-  const [presetId, setPresetId] = useState("us");
-  const [customW, setCustomW] = useState(35);
-  const [customH, setCustomH] = useState(45);
-  const [pageSizeId, setPageSizeId] = useState("a4");
-  const [quantity, setQuantity] = useState(8);
-  const [showCutLines, setShowCutLines] = useState(true);
+  // Settings (persisted)
+  const [presetId, setPresetId] = useState(pick("presetId", "us"));
+  const [customW, setCustomW] = useState(pick("customW", 35));
+  const [customH, setCustomH] = useState(pick("customH", 45));
+  const [pageSizeId, setPageSizeId] = useState(pick("pageSizeId", "a4"));
+  const [quantity, setQuantity] = useState(pick("quantity", 8));
+  const [showCutLines, setShowCutLines] = useState(pick("showCutLines", true));
 
-  // Border settings
-  const [borderEnabled, setBorderEnabled] = useState(true);
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [borderThicknessPx, setBorderThicknessPx] = useState(3); // in px
+  // Border settings (persisted)
+  const [borderEnabled, setBorderEnabled] = useState(pick("borderEnabled", true));
+  const [borderColor, setBorderColor] = useState(pick("borderColor", "#000000"));
+  const [borderThicknessPx, setBorderThicknessPx] = useState(pick("borderThicknessPx", 3));
 
-  // Layout controls
-  const [customCols, setCustomCols] = useState(5);
-  const [customRows, setCustomRows] = useState(0); // 0 = auto
-  const [gapMM, setGapMM] = useState(4);
-  const [marginMM, setMarginMM] = useState(5);
+  // Layout controls (persisted)
+  const [customCols, setCustomCols] = useState(pick("customCols", 5));
+  const [customRows, setCustomRows] = useState(pick("customRows", 0));
+  const [gapMM, setGapMM] = useState(pick("gapMM", 4));
+  const [marginMM, setMarginMM] = useState(pick("marginMM", 5));
 
   // Result
   const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
@@ -187,13 +187,33 @@ export default function PassportPhoto() {
   // AI features (MediaPipe, runs fully in-browser via WASM)
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [bgRemoved, setBgRemoved] = useState(false);
-  const [bgReplaceColor, setBgReplaceColor] = useState("#FFFFFF");
-  const [edgeRefinement, setEdgeRefinement] = useState(50);
+  const [bgReplaceColor, setBgReplaceColor] = useState(pick("bgReplaceColor", "#FFFFFF"));
+  const [edgeRefinement, setEdgeRefinement] = useState(pick("edgeRefinement", 50));
   const [aiBusy, setAiBusy] = useState<null | "bg" | "align" | "tilt" | "light" | "skin">(null);
   const lastAppliedBgSettingsRef = useRef<{
     color: string;
     edgeRefinement: number;
   } | null>(null);
+
+  // Persist settings whenever they change.
+  useEffect(() => {
+    const settings: PersistedSettings = {
+      sizeUnit, presetId, customW, customH, pageSizeId, quantity, showCutLines,
+      borderEnabled, borderColor, borderThicknessPx,
+      customCols, customRows, gapMM, marginMM,
+      bgReplaceColor, edgeRefinement,
+    };
+    try {
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch {
+      /* quota / private mode — ignore */
+    }
+  }, [
+    sizeUnit, presetId, customW, customH, pageSizeId, quantity, showCutLines,
+    borderEnabled, borderColor, borderThicknessPx,
+    customCols, customRows, gapMM, marginMM,
+    bgReplaceColor, edgeRefinement,
+  ]);
 
   // Enhancement / filters
   const [adjustments, setAdjustments] = useState<Adjustments>(DEFAULT_ADJUSTMENTS);
