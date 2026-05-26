@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, Github } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { tools, categories, type Tool } from "@/lib/tools";
 import { cn } from "@/lib/utils";
