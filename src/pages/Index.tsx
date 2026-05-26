@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, Github } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { tools, categories, type Tool } from "@/lib/tools";
 import { cn } from "@/lib/utils";
@@ -74,6 +74,20 @@ export default function Index() {
               placeholder="Search tools..."
               className="pl-10 h-12 rounded-xl"
             />
+          </div>
+
+          {/* Creator credit */}
+          <div className="mt-4 flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+            <span>Made by</span>
+            <a
+              href="https://github.com/lokeshkavisth"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-foreground hover:text-primary transition-colors"
+            >
+              lokeshkavisth
+              <Github className="h-3.5 w-3.5" />
+            </a>
           </div>
         </div>
       </section>
