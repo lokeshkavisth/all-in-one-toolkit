@@ -245,6 +245,96 @@ export async function removeBackground(
   return canvas.toDataURL("image/jpeg", 0.95);
 }
 
+/**
+ * Run segmentation and return a canvas containing the foreground (person)
+ * on a transparent background. Caller can then composite onto any bg
+ * (solid color, image, blurred original, etc.) and export as PNG/JPEG.
+ */
+export async function extractForegroundCanvas(
+  img: HTMLImageElement,
+  edgeRefinement = 60
+): Promise<HTMLCanvasElement> {
+  const segmenter = await getSegmenter();
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+
+  const result = segmenter.segment(img);
+  const masks = result.confidenceMasks;
+  if (!masks || !masks.length) throw new Error("Segmentation failed");
+  const mask = masks[0];
+
+  const maskData = new Float32Array(mask.getAsFloat32Array());
+  const mw = mask.width;
+  const mh = mask.height;
+
+  const cIdx = Math.floor(mh / 2) * mw + Math.floor(mw / 2);
+  const centerVal = maskData[cIdx];
+  const cornerVal =
+    (maskData[0] + maskData[mw - 1] + maskData[(mh - 1) * mw] + maskData[mh * mw - 1]) / 4;
+  const personIsHigh = centerVal >= cornerVal;
+
+  const prob = new Float32Array(mw * mh);
+  if (personIsHigh) {
+    for (let i = 0; i < prob.length; i++) prob[i] = maskData[i];
+  } else {
+    for (let i = 0; i < prob.length; i++) prob[i] = 1 - maskData[i];
+  }
+
+  const ref = Math.max(0, Math.min(100, edgeRefinement));
+  const erodeR = ref < 25 ? 0 : ref < 60 ? 1 : ref < 85 ? 2 : 3;
+  const blurR = ref > 80 ? 1 : 2;
+  const k = 6 + ref * 0.18;
+  const t = 0.5;
+
+  let field: Float32Array = prob;
+  if (erodeR > 0) field = erodeSep(field, mw, mh, erodeR);
+  field = gaussianBlur(field, mw, mh, blurR);
+
+  const alpha = new Float32Array(mw * mh);
+  for (let i = 0; i < alpha.length; i++) {
+    alpha[i] = 1 / (1 + Math.exp(-k * (field[i] - t)));
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, w, h);
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const px = imageData.data;
+
+  const sx = (mw - 1) / w;
+  const sy = (mh - 1) / h;
+
+  for (let y = 0; y < h; y++) {
+    const fy = y * sy;
+    const y0 = Math.floor(fy);
+    const y1 = Math.min(mh - 1, y0 + 1);
+    const wy = fy - y0;
+    const row0 = y0 * mw;
+    const row1 = y1 * mw;
+    for (let x = 0; x < w; x++) {
+      const fx = x * sx;
+      const x0 = Math.floor(fx);
+      const x1 = Math.min(mw - 1, x0 + 1);
+      const wx = fx - x0;
+
+      const a =
+        alpha[row0 + x0] * (1 - wx) * (1 - wy) +
+        alpha[row0 + x1] * wx * (1 - wy) +
+        alpha[row1 + x0] * (1 - wx) * wy +
+        alpha[row1 + x1] * wx * wy;
+
+      const i = (y * w + x) * 4;
+      px[i + 3] = Math.round(a * 255);
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  mask.close();
+  return canvas;
+}
+
 export interface FaceBox {
   x: number;
   y: number;
