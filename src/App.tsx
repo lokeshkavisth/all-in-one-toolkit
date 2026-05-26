@@ -29,6 +29,7 @@ const App = () => (
               <Route path="/tools/image-compressor" element={<ImageCompressor />} />
               <Route path="/tools/crop-image" element={<ImageCropper />} />
               <Route path="/tools/passport-photo" element={<PassportPhoto />} />
+              <Route path="/tools/remove-background" element={<RemoveBackground />} />
               <Route path="/tools/:toolId" element={<ToolPlaceholder />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
