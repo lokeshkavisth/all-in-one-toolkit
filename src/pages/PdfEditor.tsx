@@ -55,7 +55,7 @@ export default function PdfEditor() {
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,
-      TextStyle,
+      FontSizeTextStyle,
       Color,
       FontFamily.configure({ types: ["textStyle"] }),
       Highlight.configure({ multicolor: true }),
