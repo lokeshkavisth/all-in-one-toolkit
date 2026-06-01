@@ -77,8 +77,7 @@ export function EditorToolbar({ editor }: Props) {
 
       <Select
         onValueChange={(v) => {
-          // Apply size via inline style on selected text using textStyle mark
-          editor.chain().focus().setMark("textStyle", { style: `font-size:${v}px` } as never).run();
+          editor.chain().focus().setMark("textStyle", { fontSize: `${v}px` }).run();
         }}
       >
         <SelectTrigger className="h-8 w-20"><SelectValue placeholder="Size" /></SelectTrigger>
