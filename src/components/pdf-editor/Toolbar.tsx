@@ -9,8 +9,8 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, ListChecks, Quote, Minus,
   Undo2, Redo2, Link2, Image as ImageIcon, Table as TableIcon,
-  Heading1, Heading2, Heading3, Subscript as SubIcon, Superscript as SupIcon,
-  Highlighter, Type, Palette,
+  Subscript as SubIcon, Superscript as SupIcon,
+  Highlighter, Palette,
 } from "lucide-react";
 import { useRef } from "react";
 import { Input } from "@/components/ui/input";
