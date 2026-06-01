@@ -4,12 +4,12 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
-import TextStyle from "@tiptap/extension-text-style";
+import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
-import Table from "@tiptap/extension-table";
+import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
@@ -127,8 +127,8 @@ export default function PdfEditor() {
   return (
     <ToolPageLayout
       icon={FileText}
-      iconColor="text-blue-600"
-      iconBg="bg-blue-100"
+      category="pdf"
+      categoryLabel="PDF Tools"
       title="PDF Editor"
       description="Import PDF, DOCX, or images, edit like a word processor, and export to PDF, DOCX, HTML, TXT, or PNG."
     >
