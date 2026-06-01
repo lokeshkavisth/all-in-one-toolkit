@@ -1,6 +1,5 @@
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
-// @ts-expect-error vite worker url
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
