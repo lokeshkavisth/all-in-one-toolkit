@@ -109,3 +109,39 @@
     font-family: 'Space Grotesk', sans-serif;
   }
 }
+
+/* PDF Editor — imported document pages */
+.doc-page {
+  position: relative;
+  width: 8.5in;
+  max-width: 100%;
+  margin: 0 auto 1.25rem;
+  background: #fff no-repeat center / 100% 100%;
+  box-shadow: 0 2px 12px hsl(var(--foreground) / 0.1);
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+}
+.doc-page .doc-text-layer {
+  position: absolute;
+  inset: 0;
+}
+.doc-page .doc-text-layer span[data-pdf-text] {
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0 0;
+  color: transparent;
+  caret-color: #000;
+  cursor: text;
+  line-height: 1;
+}
+.doc-page .doc-text-layer span[data-pdf-text]:focus,
+.doc-page .doc-text-layer span[data-pdf-text]:hover {
+  color: #000;
+  background: hsl(var(--primary) / 0.08);
+  outline: none;
+}
+.doc-page.doc-image-page .doc-text-layer {
+  pointer-events: auto;
+}
+

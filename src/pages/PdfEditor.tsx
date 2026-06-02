@@ -5,7 +5,6 @@ import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
-// Extend TextStyle to support fontSize via inline style
 const FontSizeTextStyle = TextStyle.extend({
   addAttributes() {
     return {
@@ -38,18 +37,32 @@ import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ToolPageLayout } from "@/components/ToolPageLayout";
 import { EditorToolbar } from "@/components/pdf-editor/Toolbar";
-import { importFile } from "@/lib/pdf-editor/import";
+import { importFile, type ImportMode } from "@/lib/pdf-editor/import";
 import { exportDocx, exportHtml, exportPdf, exportPng, exportTxt } from "@/lib/pdf-editor/export";
 
-const STORAGE_KEY = "pdf-editor.doc.v1";
+const STORAGE_KEY = "pdf-editor.doc.v2";
+
+type Surface = "tiptap" | "imported";
 
 export default function PdfEditor() {
   const [name, setName] = useState("Untitled");
+  const [surface, setSurface] = useState<Surface>("tiptap");
+  const [importedHtml, setImportedHtml] = useState<string>("");
   const pageRef = useRef<HTMLDivElement>(null);
+  const importedRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Pending import dialog (only for PDFs)
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingMode, setPendingMode] = useState<ImportMode>("overlay");
 
   const editor = useEditor({
     extensions: [
@@ -82,32 +95,67 @@ export default function PdfEditor() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const { html, name: n } = JSON.parse(saved);
-        if (html) editor.commands.setContent(html);
-        if (n) setName(n);
+        const parsed = JSON.parse(saved);
+        if (parsed.surface === "imported" && parsed.html) {
+          setImportedHtml(parsed.html);
+          setSurface("imported");
+        } else if (parsed.html) {
+          editor.commands.setContent(parsed.html);
+        }
+        if (parsed.name) setName(parsed.name);
       }
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
-  // Autosave
+  // Autosave (tiptap)
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || surface !== "tiptap") return;
     const handler = () => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ html: editor.getHTML(), name }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          surface: "tiptap", html: editor.getHTML(), name,
+        }));
       } catch { /* ignore */ }
     };
     editor.on("update", handler);
     return () => { editor.off("update", handler); };
-  }, [editor, name]);
+  }, [editor, name, surface]);
 
-  const handleImport = async (file: File) => {
-    if (!editor) return;
+  // Autosave (imported) — debounced via input events on the contenteditable
+  useEffect(() => {
+    if (surface !== "imported") return;
+    const el = importedRef.current;
+    if (!el) return;
+    let t: number | undefined;
+    const handler = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            surface: "imported", html: el.innerHTML, name,
+          }));
+        } catch { /* ignore */ }
+      }, 400);
+    };
+    el.addEventListener("input", handler);
+    return () => { el.removeEventListener("input", handler); window.clearTimeout(t); };
+  }, [surface, importedHtml, name]);
+
+  const runImport = async (file: File, mode: ImportMode) => {
     try {
       toast.loading("Importing…", { id: "import" });
-      const { html, name: n } = await importFile(file);
-      editor.commands.setContent(html || "<p></p>");
+      const { html, name: n } = await importFile(file, mode);
+      const lower = file.name.toLowerCase();
+      const layoutPreserving =
+        lower.endsWith(".pdf") || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(lower);
+      if (layoutPreserving) {
+        setImportedHtml(html);
+        setSurface("imported");
+      } else {
+        setSurface("tiptap");
+        editor?.commands.setContent(html || "<p></p>");
+      }
       setName(n);
       toast.success("Imported", { id: "import" });
     } catch (e) {
@@ -115,17 +163,26 @@ export default function PdfEditor() {
     }
   };
 
+  const handleImport = async (file: File) => {
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      setPendingFile(file);
+      setPendingMode("overlay");
+      return;
+    }
+    await runImport(file, "overlay");
+  };
+
   const doExport = async (kind: "pdf" | "docx" | "html" | "txt" | "png") => {
-    if (!editor) return;
+    const surfaceEl = surface === "tiptap" ? pageRef.current! : importedRef.current!;
+    const html = surface === "tiptap" ? (editor?.getHTML() ?? "") : (importedRef.current?.innerHTML ?? "");
     const safe = (name || "document").replace(/[^\w.-]+/g, "_");
     try {
       toast.loading(`Exporting ${kind.toUpperCase()}…`, { id: "exp" });
-      const html = editor.getHTML();
-      if (kind === "pdf") await exportPdf(pageRef.current!, safe);
+      if (kind === "pdf") await exportPdf(surfaceEl, safe);
       else if (kind === "docx") await exportDocx(html, safe);
       else if (kind === "html") await exportHtml(html, safe);
       else if (kind === "txt") await exportTxt(html, safe);
-      else if (kind === "png") await exportPng(pageRef.current!, safe);
+      else if (kind === "png") await exportPng(surfaceEl, safe);
       toast.success("Downloaded", { id: "exp" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Export failed", { id: "exp" });
@@ -133,10 +190,14 @@ export default function PdfEditor() {
   };
 
   const wordCount = useMemo(() => {
+    if (surface === "imported") {
+      const txt = importedRef.current?.innerText ?? "";
+      return txt.trim().split(/\s+/).filter(Boolean).length;
+    }
     if (!editor) return 0;
     return editor.getText().trim().split(/\s+/).filter(Boolean).length;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor?.state.doc]);
+  }, [editor?.state.doc, surface, importedHtml]);
 
   return (
     <ToolPageLayout
@@ -153,7 +214,6 @@ export default function PdfEditor() {
       </Helmet>
 
       <div className="space-y-4">
-        {/* File bar */}
         <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
           <Input
             value={name}
@@ -161,6 +221,16 @@ export default function PdfEditor() {
             className="h-9 max-w-xs"
             placeholder="Document name"
           />
+          {surface === "imported" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setSurface("tiptap"); setImportedHtml(""); }}
+              title="Switch back to the rich-text editor"
+            >
+              New blank doc
+            </Button>
+          )}
           <div className="ml-auto flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
               <Upload className="mr-2 h-4 w-4" /> Import
@@ -187,17 +257,33 @@ export default function PdfEditor() {
           </div>
         </div>
 
-        {/* Editor surface */}
         <div className="rounded-lg border bg-muted/30 overflow-hidden">
-          <EditorToolbar editor={editor} />
-          <div className="overflow-auto p-6 max-h-[78vh]">
-            <div
-              ref={pageRef}
-              className="mx-auto shadow-md rounded-sm bg-card"
-              style={{ width: "min(816px, 100%)" /* ~8.5in @ 96dpi */ }}
-            >
-              <EditorContent editor={editor} />
+          {surface === "tiptap" ? (
+            <EditorToolbar editor={editor} />
+          ) : (
+            <div className="border-b bg-card px-4 py-2 text-xs text-muted-foreground">
+              Imported document — click any text to edit. Layout is preserved from the original.
             </div>
+          )}
+          <div className="overflow-auto p-6 max-h-[78vh]">
+            {surface === "tiptap" ? (
+              <div
+                ref={pageRef}
+                className="mx-auto shadow-md rounded-sm bg-card"
+                style={{ width: "min(816px, 100%)" }}
+              >
+                <EditorContent editor={editor} />
+              </div>
+            ) : (
+              <div
+                ref={importedRef}
+                className="mx-auto"
+                style={{ width: "min(816px, 100%)" }}
+                contentEditable
+                suppressContentEditableWarning
+                dangerouslySetInnerHTML={{ __html: importedHtml }}
+              />
+            )}
           </div>
           <div className="flex items-center justify-between border-t bg-card px-4 py-2 text-xs text-muted-foreground">
             <span>{wordCount} words</span>
@@ -205,6 +291,49 @@ export default function PdfEditor() {
           </div>
         </div>
       </div>
+
+      <Dialog open={!!pendingFile} onOpenChange={(o) => !o && setPendingFile(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import PDF</DialogTitle>
+            <DialogDescription>
+              Choose how to import — keep the original look in both modes.
+            </DialogDescription>
+          </DialogHeader>
+          <RadioGroup value={pendingMode} onValueChange={(v) => setPendingMode(v as ImportMode)} className="gap-3">
+            <div className="flex items-start gap-3 rounded-md border p-3">
+              <RadioGroupItem value="overlay" id="m-overlay" className="mt-1" />
+              <Label htmlFor="m-overlay" className="flex-1 cursor-pointer font-normal">
+                <div className="font-medium">Editable text overlay (recommended)</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Original page as background with every text run editable in place. Best for digital PDFs.
+                </div>
+              </Label>
+            </div>
+            <div className="flex items-start gap-3 rounded-md border p-3">
+              <RadioGroupItem value="image" id="m-image" className="mt-1" />
+              <Label htmlFor="m-image" className="flex-1 cursor-pointer font-normal">
+                <div className="font-medium">Image pages (exact look, annotate only)</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Pixel-perfect copy. Add text and shapes on top, but original text is not selectable. Best for scanned PDFs.
+                </div>
+              </Label>
+            </div>
+          </RadioGroup>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingFile(null)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                const f = pendingFile;
+                setPendingFile(null);
+                if (f) await runImport(f, pendingMode);
+              }}
+            >
+              Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ToolPageLayout>
   );
 }
