@@ -1,157 +1,241 @@
-import { Editor } from "@tiptap/react";
+import {
+  MousePointer2,
+  Type,
+  Image as ImageIcon,
+  PenTool,
+  Highlighter,
+  Eraser,
+  Pencil,
+  Square,
+  Circle as CircleIcon,
+  Minus,
+  Trash2,
+  Undo2,
+  Redo2,
+  ZoomIn,
+  ZoomOut,
+  Search,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code,
-  AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, ListChecks, Quote, Minus,
-  Undo2, Redo2, Link2, Image as ImageIcon, Table as TableIcon,
-  Subscript as SubIcon, Superscript as SupIcon,
-  Highlighter, Palette,
-} from "lucide-react";
-import { useRef } from "react";
-import { Input } from "@/components/ui/input";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { Tool, ToolConfig } from "./types";
 
-const FONTS = [
-  "Default", "Arial", "Helvetica", "Georgia", "Times New Roman",
-  "Courier New", "Verdana", "Tahoma", "Trebuchet MS", "Roboto", "Inter",
+interface Props {
+  tool: Tool;
+  setTool: (t: Tool) => void;
+  config: ToolConfig;
+  setConfig: (patch: Partial<ToolConfig>) => void;
+  onAddImage: () => void;
+  onSignature: () => void;
+  onDelete: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  zoom: number;
+  setZoom: (z: number) => void;
+  findOpen: boolean;
+  setFindOpen: (b: boolean) => void;
+  findText: string;
+  setFindText: (s: string) => void;
+  replaceText: string;
+  setReplaceText: (s: string) => void;
+  onFindReplace: (all: boolean) => void;
+}
+
+const tools: Array<{ id: Tool; icon: typeof Type; label: string }> = [
+  { id: "select", icon: MousePointer2, label: "Select" },
+  { id: "text", icon: Type, label: "Text" },
+  { id: "image", icon: ImageIcon, label: "Image" },
+  { id: "signature", icon: PenTool, label: "Signature" },
+  { id: "whiteout", icon: Eraser, label: "Whiteout" },
+  { id: "highlight", icon: Highlighter, label: "Highlight" },
+  { id: "draw", icon: Pencil, label: "Draw" },
+  { id: "rect", icon: Square, label: "Rectangle" },
+  { id: "ellipse", icon: CircleIcon, label: "Ellipse" },
+  { id: "line", icon: Minus, label: "Line" },
 ];
-const SIZES = ["10", "12", "14", "16", "18", "20", "24", "30", "36", "48", "60", "72"];
 
-type Props = { editor: Editor | null };
-
-export function EditorToolbar({ editor }: Props) {
-  const imgRef = useRef<HTMLInputElement>(null);
-  if (!editor) return null;
-
-  const insertImage = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => editor.chain().focus().setImage({ src: reader.result as string }).run();
-    reader.readAsDataURL(file);
-  };
-
-  const btn = (active: boolean) => (active ? "bg-accent text-accent-foreground" : "");
-
+export function EditorToolbar(p: Props) {
+  const isShape = ["rect", "ellipse", "line", "draw"].includes(p.tool);
   return (
-    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-1 border-b bg-card/95 backdrop-blur px-3 py-2">
-      <Button size="icon" variant="ghost" onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo2 className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" onClick={() => editor.chain().focus().redo().run()} title="Redo"><Redo2 className="h-4 w-4" /></Button>
-      <Separator orientation="vertical" className="h-6 mx-1" />
+    <TooltipProvider delayDuration={300}>
+      <div className="flex flex-wrap items-center gap-1 border-b bg-card px-2 py-1.5">
+        {tools.map((t) => (
+          <Tooltip key={t.id}>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant={p.tool === t.id ? "default" : "ghost"}
+                className="h-8 w-8"
+                onClick={() => {
+                  if (t.id === "image") p.onAddImage();
+                  else if (t.id === "signature") p.onSignature();
+                  else p.setTool(t.id);
+                }}
+              >
+                <t.icon className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t.label}</TooltipContent>
+          </Tooltip>
+        ))}
 
-      <Select
-        value={
-          editor.isActive("heading", { level: 1 }) ? "h1"
-          : editor.isActive("heading", { level: 2 }) ? "h2"
-          : editor.isActive("heading", { level: 3 }) ? "h3"
-          : "p"
-        }
-        onValueChange={(v) => {
-          if (v === "p") editor.chain().focus().setParagraph().run();
-          else editor.chain().focus().toggleHeading({ level: Number(v.slice(1)) as 1 | 2 | 3 }).run();
-        }}
-      >
-        <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="p">Paragraph</SelectItem>
-          <SelectItem value="h1">Heading 1</SelectItem>
-          <SelectItem value="h2">Heading 2</SelectItem>
-          <SelectItem value="h3">Heading 3</SelectItem>
-        </SelectContent>
-      </Select>
+        <Separator orientation="vertical" className="mx-1 h-6" />
 
-      <Select
-        onValueChange={(v) => {
-          if (v === "Default") editor.chain().focus().unsetFontFamily().run();
-          else editor.chain().focus().setFontFamily(v).run();
-        }}
-      >
-        <SelectTrigger className="h-8 w-36"><SelectValue placeholder="Font" /></SelectTrigger>
-        <SelectContent>{FONTS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
-      </Select>
+        {p.tool === "text" && (
+          <>
+            <Input
+              type="number"
+              value={p.config.fontSize}
+              onChange={(e) => p.setConfig({ fontSize: Number(e.target.value) || 16 })}
+              className="h-8 w-16"
+              min={6}
+              max={120}
+            />
+            <input
+              type="color"
+              value={p.config.fill}
+              onChange={(e) => p.setConfig({ fill: e.target.value })}
+              className="h-8 w-8 cursor-pointer rounded border"
+              title="Text color"
+            />
+            <Button
+              size="sm"
+              variant={p.config.fontWeight === "bold" ? "default" : "ghost"}
+              onClick={() =>
+                p.setConfig({ fontWeight: p.config.fontWeight === "bold" ? "normal" : "bold" })
+              }
+              className="h-8 w-8 px-0 font-bold"
+            >
+              B
+            </Button>
+            <Button
+              size="sm"
+              variant={p.config.fontStyle === "italic" ? "default" : "ghost"}
+              onClick={() =>
+                p.setConfig({ fontStyle: p.config.fontStyle === "italic" ? "normal" : "italic" })
+              }
+              className="h-8 w-8 px-0 italic"
+            >
+              I
+            </Button>
+            <Button
+              size="sm"
+              variant={p.config.underline ? "default" : "ghost"}
+              onClick={() => p.setConfig({ underline: !p.config.underline })}
+              className="h-8 w-8 px-0 underline"
+            >
+              U
+            </Button>
+          </>
+        )}
 
-      <Select
-        onValueChange={(v) => {
-          editor.chain().focus().setMark("textStyle", { fontSize: `${v}px` }).run();
-        }}
-      >
-        <SelectTrigger className="h-8 w-20"><SelectValue placeholder="Size" /></SelectTrigger>
-        <SelectContent>{SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-      </Select>
+        {p.tool === "highlight" && (
+          <input
+            type="color"
+            value={p.config.highlightColor}
+            onChange={(e) => p.setConfig({ highlightColor: e.target.value })}
+            className="h-8 w-8 cursor-pointer rounded border"
+            title="Highlight color"
+          />
+        )}
 
-      <Separator orientation="vertical" className="h-6 mx-1" />
+        {isShape && (
+          <>
+            <input
+              type="color"
+              value={p.tool === "draw" ? p.config.drawColor : p.config.stroke}
+              onChange={(e) =>
+                p.tool === "draw"
+                  ? p.setConfig({ drawColor: e.target.value })
+                  : p.setConfig({ stroke: e.target.value })
+              }
+              className="h-8 w-8 cursor-pointer rounded border"
+              title="Color"
+            />
+            <Input
+              type="number"
+              value={p.config.strokeWidth}
+              onChange={(e) => p.setConfig({ strokeWidth: Number(e.target.value) || 1 })}
+              className="h-8 w-16"
+              min={1}
+              max={40}
+              title="Stroke width"
+            />
+          </>
+        )}
 
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("bold"))} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold"><Bold className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("italic"))} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic"><Italic className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("underline"))} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline"><UnderlineIcon className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("strike"))} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough"><Strikethrough className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("code"))} onClick={() => editor.chain().focus().toggleCode().run()} title="Inline code"><Code className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("subscript"))} onClick={() => editor.chain().focus().toggleSubscript().run()} title="Subscript"><SubIcon className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("superscript"))} onClick={() => editor.chain().focus().toggleSuperscript().run()} title="Superscript"><SupIcon className="h-4 w-4" /></Button>
+        <div className="ml-auto flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => p.setFindOpen(!p.findOpen)}>
+                <Search className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Find &amp; replace</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={p.onUndo}>
+                <Undo2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Undo</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={p.onRedo}>
+                <Redo2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Redo</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={p.onDelete}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete selected</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="mx-1 h-6" />
+          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => p.setZoom(Math.max(0.4, p.zoom - 0.1))}>
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <span className="w-12 text-center text-xs tabular-nums">{Math.round(p.zoom * 100)}%</span>
+          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => p.setZoom(Math.min(2.5, p.zoom + 0.1))}>
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button size="icon" variant="ghost" title="Text color"><Palette className="h-4 w-4" /></Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-44">
-          <Input type="color" onChange={(e) => editor.chain().focus().setColor(e.target.value).run()} className="h-10 w-full p-1" />
-          <Button variant="ghost" size="sm" className="mt-2 w-full" onClick={() => editor.chain().focus().unsetColor().run()}>Clear color</Button>
-        </PopoverContent>
-      </Popover>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button size="icon" variant="ghost" title="Highlight"><Highlighter className="h-4 w-4" /></Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-44">
-          <Input type="color" defaultValue="#fff59d" onChange={(e) => editor.chain().focus().toggleHighlight({ color: e.target.value }).run()} className="h-10 w-full p-1" />
-          <Button variant="ghost" size="sm" className="mt-2 w-full" onClick={() => editor.chain().focus().unsetHighlight().run()}>Remove highlight</Button>
-        </PopoverContent>
-      </Popover>
-
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      <Button size="icon" variant="ghost" className={btn(editor.isActive({ textAlign: "left" }))} onClick={() => editor.chain().focus().setTextAlign("left").run()}><AlignLeft className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive({ textAlign: "center" }))} onClick={() => editor.chain().focus().setTextAlign("center").run()}><AlignCenter className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive({ textAlign: "right" }))} onClick={() => editor.chain().focus().setTextAlign("right").run()}><AlignRight className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive({ textAlign: "justify" }))} onClick={() => editor.chain().focus().setTextAlign("justify").run()}><AlignJustify className="h-4 w-4" /></Button>
-
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("bulletList"))} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list"><List className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("orderedList"))} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list"><ListOrdered className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("taskList"))} onClick={() => editor.chain().focus().toggleTaskList().run()} title="Task list"><ListChecks className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" className={btn(editor.isActive("blockquote"))} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Quote"><Quote className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider"><Minus className="h-4 w-4" /></Button>
-
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      <Button size="icon" variant="ghost" onClick={() => {
-        const url = window.prompt("Enter URL");
-        if (url) editor.chain().focus().extendMarkRange("link").setLink({ href: url, target: "_blank" }).run();
-      }} title="Link"><Link2 className="h-4 w-4" /></Button>
-      <Button size="icon" variant="ghost" onClick={() => imgRef.current?.click()} title="Image"><ImageIcon className="h-4 w-4" /></Button>
-      <input ref={imgRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) insertImage(f); e.target.value = ""; }} />
-
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button size="icon" variant="ghost" title="Table"><TableIcon className="h-4 w-4" /></Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 space-y-2">
-          <Button size="sm" className="w-full" variant="outline" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>Insert 3×3 table</Button>
-          <div className="grid grid-cols-2 gap-2">
-            <Button size="sm" variant="ghost" onClick={() => editor.chain().focus().addRowAfter().run()}>+ Row</Button>
-            <Button size="sm" variant="ghost" onClick={() => editor.chain().focus().addColumnAfter().run()}>+ Col</Button>
-            <Button size="sm" variant="ghost" onClick={() => editor.chain().focus().deleteRow().run()}>− Row</Button>
-            <Button size="sm" variant="ghost" onClick={() => editor.chain().focus().deleteColumn().run()}>− Col</Button>
-          </div>
-          <Button size="sm" variant="destructive" className="w-full" onClick={() => editor.chain().focus().deleteTable().run()}>Delete table</Button>
-        </PopoverContent>
-      </Popover>
-    </div>
+      {p.findOpen && (
+        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-3 py-2">
+          <Input
+            value={p.findText}
+            onChange={(e) => p.setFindText(e.target.value)}
+            placeholder="Find"
+            className="h-8 w-48"
+          />
+          <Input
+            value={p.replaceText}
+            onChange={(e) => p.setReplaceText(e.target.value)}
+            placeholder="Replace"
+            className="h-8 w-48"
+          />
+          <Button size="sm" variant="outline" onClick={() => p.onFindReplace(false)}>Replace</Button>
+          <Button size="sm" onClick={() => p.onFindReplace(true)}>Replace all</Button>
+          <span className="text-xs text-muted-foreground">
+            Only edits text you added in the editor — not the original PDF text.
+          </span>
+        </div>
+      )}
+    </TooltipProvider>
   );
 }
